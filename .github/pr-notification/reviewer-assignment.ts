@@ -10,13 +10,6 @@ type ReviewerAssignmentInput = {
   existingReviewers: string[];
 };
 
-type ReviewerRequest = {
-  repository: string;
-  pullNumber: string;
-  reviewer: string;
-  token: string;
-};
-
 export function selectReviewer({
   candidates,
   author,
@@ -55,23 +48,6 @@ export function existingReviewerLogins(value: string | undefined): string[] {
   }
 }
 
-export async function requestReviewer({ repository, pullNumber, reviewer, token }: ReviewerRequest): Promise<void> {
-  const response = await fetch(`https://api.github.com/repos/${repository}/pulls/${pullNumber}/requested_reviewers`, {
-    method: "POST",
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-    body: JSON.stringify({ reviewers: [reviewer] }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`GitHub 리뷰어 지정 요청에 실패했습니다. (상태 코드: ${response.status})`);
-  }
-}
-
 export async function main(environment = process.env): Promise<void> {
   const existingReviewers = existingReviewerLogins(environment.REQUESTED_REVIEWERS_JSON);
   const reviewer = selectReviewer({
@@ -90,7 +66,7 @@ export async function main(environment = process.env): Promise<void> {
   const token = environment.GITHUB_TOKEN;
   if (!repository || !token) throw new Error("GitHub 리뷰어 지정을 위한 저장소 정보 또는 토큰이 없습니다.");
 
-  await requestReviewer({ repository, pullNumber: environment.NUMBER ?? "", reviewer, token });
+  await new GitHubApi(new RetryingHttp(), token, repository).requestReviewers(Number(environment.NUMBER), [reviewer]);
 
   if (environment.GITHUB_OUTPUT) {
     appendFileSync(environment.GITHUB_OUTPUT, `reviewer=${reviewer}\n`, { encoding: "utf8" });
@@ -104,4 +80,6 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).
   });
 }
 import { appendFileSync } from "node:fs";
+import { GitHubApi } from "../github/github-api.ts";
+import { RetryingHttp } from "../github/retrying-http.ts";
 import { loadMembers } from "./member-configuration-parser.ts";

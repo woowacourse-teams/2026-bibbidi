@@ -29,25 +29,34 @@ repositories {
 }
 
 dependencies {
-    // APPLICATION
+    implementation platform('org.springframework.ai:spring-ai-bom:2.0.1')
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    implementation 'org.springframework.security:spring-security-crypto'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.ai:spring-ai-starter-model-bedrock-converse'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
-    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
-    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+    implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
     implementation 'org.bouncycastle:bcprov-jdk18on:1.85.2'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
+    runtimeOnly 'org.flywaydb:flyway-mysql'
     runtimeOnly 'com.h2database:h2'
+    runtimeOnly 'org.springframework.boot:spring-boot-h2console'
     annotationProcessor 'org.projectlombok:lombok'
-
-    // TEST
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.2'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'io.projectreactor:reactor-test'
+    testImplementation 'org.testcontainers:testcontainers-mysql'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
@@ -56,10 +65,48 @@ dependencies {
 apply from: 'gradle/documentation.gradle'
 apply from: 'gradle/jacoco.gradle'
 
+// Docker 유무에 따라 MySQL 마이그레이션 테스트가 실행되거나 건너뛰어지므로 캐시 키에 넣는다.
+def dockerAvailable = providers.provider {
+    try {
+        def process = new ProcessBuilder('docker', 'info')
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+        if (!process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            return false
+        }
+        return process.exitValue() == 0
+    } catch (IOException ignored) {
+        return false
+    }
+}
+
+tasks.named('test', Test) {
+    exclude '**/BibbidiEvaluationIntegrationTest.class', '**/EvaluationContextIntegrationTest.class'
+    inputs.property('dockerAvailable', dockerAvailable)
+    testLogging {
+        events 'skipped', 'failed'
+    }
+}
+
+tasks.register('aiEvaluationTest', Test) {
+    description = 'Runs the AI evaluation manually.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/BibbidiEvaluationIntegrationTest.class', '**/EvaluationContextIntegrationTest.class'
+    useJUnitPlatform()
+    // 평가 테스트는 같은 DB를 쓰므로 병렬로 실행하지 않는다.
+    systemProperty 'junit.jupiter.execution.parallel.enabled', 'false'
+    outputs.doNotCacheIf('외부 AI 호출 결과는 Gradle이 추적하는 입력에 없어 재사용하면 안 된다') { true }
+}
+
 tasks.named('bootJar') {
     archiveFileName = 'app.jar'
 }
 
 tasks.named('processResources') {
     from('database/mysql/load_catalog.sql')
+    from('database/mysql/load_terms.sql')
 }

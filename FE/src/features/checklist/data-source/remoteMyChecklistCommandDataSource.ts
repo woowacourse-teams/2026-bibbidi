@@ -2,6 +2,7 @@ import {
   ChecklistItemStatus,
   isChecklistItemStatus,
 } from "../model/myChecklist";
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 import {
   AppointmentCreationRequest,
   AppointmentCreationResponse,
@@ -11,6 +12,7 @@ import {
   AppointmentCompletionResponse,
   remoteAppointmentManagementDataSource,
 } from "./remoteAppointmentManagementDataSource";
+import { isValidLocalDateTime } from "../../../shared/validation/isValidLocalDateTime";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists`;
@@ -34,6 +36,7 @@ export interface RemoteMyChecklistCommandDataSource {
     request: AppointmentCreationRequest,
     signal?: AbortSignal,
   ): Promise<AppointmentCreationResponse>;
+  deleteChecklistItem?(itemId: number, signal?: AbortSignal): Promise<void>;
   deleteAppointment(appointmentId: number, signal?: AbortSignal): Promise<void>;
   changeChecklistItemCategory(
     itemId: number,
@@ -71,6 +74,7 @@ export interface RemoteMyChecklistCommandDataSource {
 export interface ChecklistItemChangeResponse {
   catalogItemId: number | null;
   categoryId: number;
+  createdAt: string;
   id: number;
   status: ChecklistItemStatus;
   title: string;
@@ -263,6 +267,7 @@ function isChecklistItemChangeResponse(
     isValidChecklistId(value.id) &&
     (value.catalogItemId === null || isValidChecklistId(value.catalogItemId)) &&
     isValidChecklistId(value.categoryId) &&
+    isValidLocalDateTime(value.createdAt) &&
     typeof value.title === "string" &&
     isChecklistItemStatus(value.status)
   );
@@ -309,7 +314,7 @@ async function createChecklist(signal?: AbortSignal): Promise<number> {
     let response: Response;
 
     try {
-      response = await fetch(CHECKLIST_ENDPOINT, {
+      response = await authenticatedFetch(CHECKLIST_ENDPOINT, {
         credentials: "include",
         method: "POST",
         signal: controller.signal,
@@ -396,7 +401,7 @@ async function createCustomChecklistItem(
     let response: Response;
 
     try {
-      response = await fetch(CUSTOM_CHECKLIST_ITEM_ENDPOINT, {
+      response = await authenticatedFetch(CUSTOM_CHECKLIST_ITEM_ENDPOINT, {
         body: JSON.stringify({ categoryId, title }),
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -503,7 +508,7 @@ async function changeChecklistItem(
     let response: Response;
 
     try {
-      response = await fetch(
+      response = await authenticatedFetch(
         `${CHECKLIST_ITEM_ENDPOINT}/${itemId}/${property}`,
         {
           body: requestBody,
@@ -629,7 +634,7 @@ async function hasRemainingAppointments(
     let response: Response;
 
     try {
-      response = await fetch(
+      response = await authenticatedFetch(
         `${CHECKLIST_ITEM_ENDPOINT}/${itemId}/remaining-appointments`,
         {
           credentials: "include",
@@ -684,6 +689,70 @@ async function hasRemainingAppointments(
   }
 }
 
+async function deleteChecklistItem(
+  itemId: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  const controller = new AbortController();
+  let didTimeout = false;
+  const handleCallerAbort = () => controller.abort();
+  const timeoutId = window.setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, CHECKLIST_COMMAND_TIMEOUT_MS);
+
+  if (signal?.aborted) {
+    controller.abort();
+  } else {
+    signal?.addEventListener("abort", handleCallerAbort, { once: true });
+  }
+
+  try {
+    let response: Response;
+    try {
+      response = await authenticatedFetch(
+        `${CHECKLIST_ITEM_ENDPOINT}/${itemId}`,
+        {
+          credentials: "include",
+          method: "DELETE",
+          signal: controller.signal,
+        },
+      );
+    } catch (error) {
+      throw toChecklistItemChangeRequestError(error, didTimeout, signal);
+    }
+
+    if (didTimeout || signal?.aborted) {
+      throw toChecklistItemChangeRequestError(
+        new DOMException("aborted", "AbortError"),
+        didTimeout,
+        signal,
+      );
+    }
+
+    if (!response.ok) {
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        body = undefined;
+      }
+      throw new RemoteChecklistItemChangeApiError(
+        isApiErrorResponse(body) ? body.errorCode : 0,
+        response.status,
+        isApiErrorResponse(body) ? body.message : undefined,
+      );
+    }
+
+    if (response.status !== 204) {
+      throw new RemoteChecklistItemChangeContractError();
+    }
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", handleCallerAbort);
+  }
+}
+
 export const remoteMyChecklistCommandDataSource: RemoteMyChecklistCommandDataSource =
   {
     changeAppointmentCompletion:
@@ -693,6 +762,7 @@ export const remoteMyChecklistCommandDataSource: RemoteMyChecklistCommandDataSou
     changeChecklistItemTitle,
     createChecklist,
     createAppointment: createRemoteAppointment,
+    deleteChecklistItem,
     createCustomChecklistItem,
     hasRemainingAppointments,
     deleteAppointment: remoteAppointmentManagementDataSource.deleteAppointment,

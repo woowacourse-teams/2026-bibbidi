@@ -1,0 +1,11 @@
+{
+  "name": "scenario29",
+  "metrics": [
+    "Relevance",
+    "Helpfulness"
+  ],
+  "userMessage": "스튜디오 촬영 시안에만 관련된 준비 항목을 알려 주세요.",
+  "chatMemory": [],
+  "referenceAnswer": "'촬영 시안 제작'과 '참고 사진·레퍼런스 전달'에 집중한다.",
+  "expectedRefusal": "none"
+}

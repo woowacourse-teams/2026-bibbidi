@@ -61,9 +61,8 @@ Controller → Service → Repository → Dao / Mapper
 
 ## 스키마 변경
 
-- `bibbidi_mvp_schema.sql`은 DB를 처음 만들 때만 실행된다. 이 파일만 고치면 이미 만들어진 DB는 바뀌지 않는다.
-- 이미 만들어진 DB까지 바꿔야 하는 변경은 `BE/database/mysql/migration/`에 실행 순서대로 번호를 붙인 SQL로 함께 남긴다.
-- 새 DB는 스키마 파일로, 기존 DB는 마이그레이션으로 같은 상태에 도달하도록 두 파일을 맞춘다.
+- MySQL 스키마는 `BE/src/main/resources/db/migration/`의 Flyway SQL로 관리한다.
+- 변경은 `V2__설명.sql`처럼 새 버전으로 추가하고, 이미 적용한 파일은 수정하지 않는다.
 - `ddl-auto: validate`는 널 허용 여부까지 검사하지 않는다. 스키마 변경은 이 설정에 기대지 않고 SQL로 명시한다.
 
 ## 예외

@@ -11,15 +11,21 @@ http {
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
 
-    # limit 제한은 차후 사용 패턴에 따라 변경되어야 합니다.
     limit_req_zone $binary_remote_addr zone=per_ip_api:10m rate=20r/s;
     limit_conn_zone $binary_remote_addr zone=per_ip_conn:10m;
     limit_req_status 429;
     limit_conn_status 429;
     limit_req_log_level warn;
 
+    map $status $log_severity {
+        ~^5 error;
+        ~^4 warn;
+        default info;
+    }
+
     log_format otel_json escape=json
         '{"timestamp":"$time_iso8601",'
+        '"severity_text":"$log_severity",'
         '"client.address":"$remote_addr",'
         '"http.request.method":"$request_method",'
         '"url.path":"$uri",'
@@ -113,9 +119,44 @@ http {
             return 200 'ok\n';
         }
 
+        # AI chat streams SSE. Pass each event through without buffering, and wait
+        # longer than the app's own 60s response timeout so its failure event arrives first.
+        location ^~ /api/ai/ {
+            ${NGINX_API_RATE_LIMIT}
+            ${NGINX_API_CONN_LIMIT}
+
+            add_header Strict-Transport-Security "max-age=31536000" always;
+            add_header X-Content-Type-Options nosniff always;
+            add_header X-Frame-Options DENY always;
+            add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+            add_header Access-Control-Allow-Origin $cors_origin always;
+            add_header Vary Origin always;
+            add_header Access-Control-Allow-Methods 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+            add_header Access-Control-Allow-Headers 'Content-Type, Authorization, X-Requested-With' always;
+            add_header Access-Control-Allow-Credentials true always;
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_read_timeout 75s;
+
+            proxy_pass http://backend:8080;
+            proxy_hide_header Access-Control-Allow-Origin;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
         location ^~ /api/ {
-            limit_req zone=per_ip_api burst=60 nodelay;
-            limit_conn per_ip_conn 40;
+            ${NGINX_API_RATE_LIMIT}
+            ${NGINX_API_CONN_LIMIT}
 
             add_header Strict-Transport-Security "max-age=31536000" always;
             add_header X-Content-Type-Options nosniff always;
@@ -145,9 +186,46 @@ http {
             return 404;
         }
 
+        location ^~ /swagger-ui {
+            allow ${ONLY_DEVELOPER_ALLOWED_IP};
+            deny all;
+
+            proxy_pass http://backend:8080;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location = /docs/openapi3.yaml {
+            allow ${ONLY_DEVELOPER_ALLOWED_IP};
+            deny all;
+
+            proxy_pass http://backend:8080;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location ^~ /h2-console {
+            allow ${ONLY_DEVELOPER_ALLOWED_IP};
+            deny all;
+
+            add_header Strict-Transport-Security "max-age=31536000" always;
+            add_header X-Content-Type-Options nosniff always;
+            add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+            proxy_pass http://backend:8080;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
         location / {
-            limit_req zone=per_ip_api burst=60 nodelay;
-            limit_conn per_ip_conn 40;
+            ${NGINX_API_RATE_LIMIT}
+            ${NGINX_API_CONN_LIMIT}
 
             proxy_pass http://backend:8080;
             proxy_set_header Host $host;

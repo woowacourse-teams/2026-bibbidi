@@ -8,7 +8,7 @@ interface PreparationTaskListProps {
   addingCatalogItemIds?: readonly string[];
   canAddTasks?: boolean;
   density?: PreparationTaskListDensity;
-  isScrollable?: boolean;
+  emptyDescription?: string;
   onTaskAdd?: (catalogItemId: string) => void;
   tasks: PreparationStepTaskViewModel[];
   variant: PreparationTaskListVariant;
@@ -16,8 +16,9 @@ interface PreparationTaskListProps {
 
 function PreparationTaskEmptyState({
   density,
+  emptyDescription,
   variant,
-}: Pick<PreparationTaskListProps, "density" | "variant">) {
+}: Pick<PreparationTaskListProps, "density" | "emptyDescription" | "variant">) {
   const message =
     variant === "available"
       ? {
@@ -40,7 +41,7 @@ function PreparationTaskEmptyState({
         </svg>
       </span>
       <h3>{message.title}</h3>
-      <p>{message.description}</p>
+      <p>{emptyDescription ?? message.description}</p>
     </div>
   );
 }
@@ -49,13 +50,19 @@ export function PreparationTaskList({
   addingCatalogItemIds = [],
   canAddTasks = false,
   density = "regular",
-  isScrollable = false,
+  emptyDescription,
   onTaskAdd,
   tasks,
   variant,
 }: PreparationTaskListProps) {
   if (tasks.length === 0) {
-    return <PreparationTaskEmptyState density={density} variant={variant} />;
+    return (
+      <PreparationTaskEmptyState
+        density={density}
+        emptyDescription={emptyDescription}
+        variant={variant}
+      />
+    );
   }
 
   return (
@@ -65,7 +72,7 @@ export function PreparationTaskList({
           ? "이 단계에 추가한 할 일"
           : "추가할 수 있는 할 일"
       }
-      className={`preparation-task-list preparation-task-list--${variant} preparation-task-list--${density}${isScrollable ? " preparation-task-list--scrollable" : ""}`}
+      className={`preparation-task-list preparation-task-list--${variant} preparation-task-list--${density}`}
     >
       {tasks.map((task) => (
         <li className="preparation-task-list__item" key={task.id}>
@@ -113,7 +120,6 @@ interface PreparationAddAllTasksButtonProps {
   isLoading?: boolean;
   label?: string;
   onClick?: () => void;
-  size?: "compact" | "large" | "regular";
 }
 
 export function PreparationAddAllTasksButton({
@@ -121,12 +127,11 @@ export function PreparationAddAllTasksButton({
   isLoading = false,
   label = "모든 할 일 추가",
   onClick,
-  size = "regular",
 }: PreparationAddAllTasksButtonProps) {
   return (
     <button
       aria-label={`${label}${isLoading ? " 중" : isDisabled ? " (준비 중)" : ""}`}
-      className={`preparation-task-list__add-all preparation-task-list__add-all--${size}`}
+      className="preparation-task-list__add-all"
       disabled={isDisabled}
       onClick={onClick}
       type="button"

@@ -10,11 +10,13 @@ import com.bibbidi.wedding.checklist.persistence.JpaChecklistEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemEntity;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistItemRepository;
 import com.bibbidi.wedding.checklist.persistence.JpaChecklistRepository;
+import com.bibbidi.wedding.support.TestDatabaseLocks;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
@@ -23,6 +25,7 @@ import org.springframework.test.context.ActiveProfiles;
 @DataJpaTest
 @ActiveProfiles("test")
 @Import({AppointmentRepository.class, AppointmentMapper.class})
+@ResourceLock(TestDatabaseLocks.SPRING_TEST)
 class AppointmentRepositoryTest {
 
     @Autowired

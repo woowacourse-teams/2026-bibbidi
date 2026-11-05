@@ -20,6 +20,7 @@ export interface MyChecklistAppointmentModel {
 export interface MyChecklistItemModel {
   appointments: MyChecklistAppointmentModel[];
   categoryId: number;
+  createdAt: string | null;
   id: number;
   sourceCatalogItemId: number | null;
   status: ChecklistItemStatus;

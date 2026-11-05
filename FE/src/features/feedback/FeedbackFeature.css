@@ -324,7 +324,7 @@
     cursor: default;
   }
 
-  .feedback-bottom-sheet__content {
+  .feedback-bottom-sheet__dialog {
     position: fixed;
     right: 0;
     bottom: 0;

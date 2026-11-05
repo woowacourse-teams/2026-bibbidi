@@ -7,17 +7,30 @@ interface UnscheduledTaskProps {
   viewModel: UnscheduledTaskViewModel;
 }
 
-function CalendarPlusIcon() {
+export function CalendarPlusIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="unscheduled-task-card__calendar-icon"
+      className="unscheduled-task-item__calendar-icon"
       fill="none"
       viewBox="0 0 24 24"
     >
       <path d="M7 3v3M17 3v3M4 9h16" />
       <rect height="16" rx="2" width="16" x="4" y="5" />
       <path d="M15 13v6M12 16h6" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="unscheduled-task__chevron"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path d="m9 18 6-6-6-6" />
     </svg>
   );
 }
@@ -30,26 +43,30 @@ export function UnscheduledTask({ viewModel }: UnscheduledTaskProps) {
     >
       <header className="unscheduled-task__header">
         <h2 id="unscheduled-task-title">{viewModel.title}</h2>
+        <Link className="unscheduled-task__roadmap-action" to="/preparation">
+          {viewModel.roadmapActionLabel}
+          <ChevronRightIcon />
+        </Link>
       </header>
 
       <ul className="unscheduled-task__list">
         {viewModel.items.map((item) => (
-          <li className="unscheduled-task-card" key={item.id}>
-            <div className="unscheduled-task-card__top">
-              <span className="unscheduled-task-card__category">
+          <li className="unscheduled-task-item" key={item.id}>
+            <div className="unscheduled-task-item__badges">
+              <span className="unscheduled-task-item__category">
                 {item.categoryLabel}
               </span>
-              <span className="unscheduled-task-card__status">
+              <span className="unscheduled-task-item__status">
                 <span
                   aria-hidden="true"
-                  className="unscheduled-task-card__status-dot"
+                  className="unscheduled-task-item__status-dot"
                 />
                 {item.statusLabel}
               </span>
             </div>
-            <h3 className="unscheduled-task-card__title">{item.title}</h3>
+            <h3 className="unscheduled-task-item__title">{item.title}</h3>
             <Link
-              className="unscheduled-task-card__add-schedule"
+              className="unscheduled-task-item__add-schedule"
               state={{ checklistDetailDepth: 1 }}
               to={`/checklist?taskId=checklist-item-${item.id}&addAppointment=true`}
             >

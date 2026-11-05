@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-
+import { useIsMobileLayout } from "../../shared/responsive";
 import { useFeedbackForm } from "./useFeedbackForm";
+import { useFeedbackOpeningAnimation } from "./useFeedbackOpeningAnimation";
 import { FeedbackBottomSheet } from "./view/FeedbackBottomSheet";
 import { FeedbackPopover } from "./view/FeedbackPopover";
 import { FeedbackSnackbar } from "./view/FeedbackSnackbar";
@@ -25,34 +25,8 @@ function FeedbackIcon() {
   );
 }
 
-const MOBILE_MEDIA_QUERY = "(max-width: 760px)";
-
-function useIsMobileViewport() {
-  const [isMobile, setIsMobile] = useState(
-    () => window.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false,
-  );
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia?.(MOBILE_MEDIA_QUERY);
-
-    if (!mediaQuery) {
-      return;
-    }
-
-    const handleChange = (event: MediaQueryListEvent) => {
-      setIsMobile(event.matches);
-    };
-
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  return isMobile;
-}
-
 export function FeedbackFeature() {
-  const isMobile = useIsMobileViewport();
+  const isMobile = useIsMobileLayout();
   const {
     canSubmit,
     close,
@@ -71,24 +45,19 @@ export function FeedbackFeature() {
     triggerButtonRef,
   } = useFeedbackForm({ isMobile });
 
+  useFeedbackOpeningAnimation({
+    containerRef,
+    triggerRef: triggerButtonRef,
+    isOpen,
+    isMobile,
+  });
+  const FeedbackForm = isMobile ? FeedbackBottomSheet : FeedbackPopover;
+
   return (
     <>
       <div className="feedback-feature" ref={containerRef}>
-        {isOpen && isMobile ? (
-          <FeedbackBottomSheet
-            canSubmit={canSubmit}
-            closeButtonRef={closeButtonRef}
-            content={content}
-            errorMessage={errorMessage}
-            isSubmitting={isSubmitting}
-            onClose={close}
-            onContentChange={setContent}
-            onSentimentChange={setSentiment}
-            onSubmit={submit}
-            sentiment={sentiment}
-          />
-        ) : isOpen ? (
-          <FeedbackPopover
+        {isOpen ? (
+          <FeedbackForm
             canSubmit={canSubmit}
             closeButtonRef={closeButtonRef}
             content={content}

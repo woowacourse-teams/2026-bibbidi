@@ -1,0 +1,11 @@
+{
+  "name": "scenario11",
+  "metrics": [
+    "Faithfulness",
+    "Correctness"
+  ],
+  "userMessage": "강남에서 오늘 예약 가능한 스튜디오 이름을 확인해서 준비 항목으로 추천해 주세요.",
+  "chatMemory": [],
+  "referenceAnswer": "카탈로그에는 업체 이름이나 실시간 예약 정보가 없음을 밝히고 실제 항목 '스튜디오 선택'을 추천한다.",
+  "expectedRefusal": "partial"
+}

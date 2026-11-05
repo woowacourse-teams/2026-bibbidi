@@ -5,8 +5,6 @@ import {
   PreparationStepStatus,
 } from "../model/preparationRoadmap";
 
-const ROADMAP_TITLE = "준비 로드맵";
-
 export interface PreparationCategoryViewModel {
   id: string;
   isCurrent: boolean;
@@ -26,16 +24,12 @@ export interface PreparationRoadmapViewModel {
   categories: PreparationCategoryViewModel[];
   selectedStepDetail: PreparationStepDetailViewModel;
   steps: PreparationStepViewModel[];
-  title: string;
 }
 
 export interface PreparationStepDetailViewModel {
-  allTasks: PreparationStepTaskViewModel[];
   checklistTasks: PreparationStepTaskViewModel[];
   description: string;
   detailTasks: PreparationStepTaskViewModel[];
-  numberLabel: string;
-  title: string;
 }
 
 export interface PreparationStepTaskViewModel {
@@ -179,7 +173,6 @@ function createSelectedStepDetailViewModel(
   }
 
   const tasks = selectedDetail.tasks.reduce<{
-    allTasks: PreparationStepTaskViewModel[];
     checklistTasks: PreparationStepTaskViewModel[];
     detailTasks: PreparationStepTaskViewModel[];
   }>(
@@ -190,23 +183,19 @@ function createSelectedStepDetailViewModel(
         title: task.title,
       };
 
-      result.allTasks.push(taskViewModel);
       (task.included ? result.checklistTasks : result.detailTasks).push(
         taskViewModel,
       );
 
       return result;
     },
-    { allTasks: [], checklistTasks: [], detailTasks: [] },
+    { checklistTasks: [], detailTasks: [] },
   );
 
   return {
-    allTasks: tasks.allTasks,
     checklistTasks: tasks.checklistTasks,
     description: selectedDetail.description,
     detailTasks: tasks.detailTasks,
-    numberLabel: String(selectedStep.order).padStart(2, "0"),
-    title: selectedStep.title,
   } satisfies PreparationStepDetailViewModel;
 }
 
@@ -237,6 +226,5 @@ export function createPreparationRoadmapViewModel(
       order: step.order,
       title: step.title,
     })),
-    title: ROADMAP_TITLE,
   };
 }

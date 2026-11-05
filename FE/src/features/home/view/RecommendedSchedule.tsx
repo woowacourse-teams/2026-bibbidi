@@ -4,6 +4,7 @@ import { RecommendedScheduleViewModel } from "../view-model/createRecommendedSch
 import "./RecommendedSchedule.css";
 
 interface RecommendedScheduleProps {
+  compact?: boolean;
   onAddTask: (catalogItemId: number) => void;
   viewModel: RecommendedScheduleViewModel;
 }
@@ -25,7 +26,7 @@ function PlusIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="recommended-schedule-card__plus"
+      className="recommended-schedule-item__plus"
       fill="none"
       viewBox="0 0 24 24"
     >
@@ -37,6 +38,7 @@ function PlusIcon() {
 export function RecommendedSchedule({
   onAddTask,
   viewModel,
+  compact = false,
 }: RecommendedScheduleProps) {
   return (
     <section
@@ -45,35 +47,50 @@ export function RecommendedSchedule({
     >
       <header className="recommended-schedule__header">
         <h2 id="recommended-schedule-title">{viewModel.title}</h2>
-        <Link className="recommended-schedule__catalog-action" to="/">
-          {viewModel.catalogActionLabel}
+        <Link
+          className="recommended-schedule__catalog-action"
+          to="/preparation"
+        >
+          로드맵 전체 보기
           <ChevronRightIcon />
         </Link>
       </header>
 
+      {!compact && (
+        <p className="recommended-schedule__description">
+          아직 담지 않은 로드맵 항목 중 추가하면 좋은 준비예요.
+        </p>
+      )}
       <ul className="recommended-schedule__list">
         {viewModel.items.map((item) => (
-          <li className="recommended-schedule-card" key={item.catalogItemId}>
-            <div className="recommended-schedule-card__top">
-              <span>{item.categoryLabel}</span>
+          <li className="recommended-schedule-item" key={item.catalogItemId}>
+            <div className="recommended-schedule-item__badges">
+              <span className="recommended-schedule-item__category">
+                {item.categoryLabel}
+              </span>
+              {!compact && (
+                <span className="recommended-schedule-item__step">
+                  {item.stepName}
+                </span>
+              )}
             </div>
 
-            <div className="recommended-schedule-card__body">
+            <div className="recommended-schedule-item__body">
               <h3>{item.title}</h3>
-              <p>{item.stepName}</p>
             </div>
 
             <button
-              className="recommended-schedule-card__add-task"
+              className="recommended-schedule-item__add-task"
               disabled={item.isAddActionDisabled}
+              aria-busy={item.addActionLabel === "추가 중..."}
               onClick={() => onAddTask(item.catalogItemId)}
               type="button"
             >
-              <PlusIcon />
+              {item.addActionLabel === "내 할 일에 추가" && <PlusIcon />}
               {item.addActionLabel}
             </button>
             {item.additionErrorMessage && (
-              <p className="recommended-schedule-card__error" role="alert">
+              <p className="recommended-schedule-item__error" role="alert">
                 {item.additionErrorMessage}
               </p>
             )}

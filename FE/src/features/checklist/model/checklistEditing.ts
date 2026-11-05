@@ -1,6 +1,7 @@
 import { ChecklistItemStatus } from "./myChecklist";
 
-export type ChecklistItemChangeKind = "category" | "status" | "title";
+export type ChecklistItemChangeKind =
+  "category" | "delete" | "status" | "title";
 
 export type ChecklistItemChangeFeedback =
   | { status: "idle" }
@@ -34,10 +35,12 @@ export type ChecklistItemStatusChangeResult =
   "changed" | "confirmation-required" | "failed";
 
 export interface ChecklistItemEditingController {
+  cancelDelete?(): void;
   categoryEditSession: ChecklistItemCategoryEditSession | null;
   cancelStatusChange(itemId: number): void;
   changeCategory(itemId: number, categoryId: string): Promise<boolean>;
   changeFeedback: ChecklistItemChangeFeedback;
+  confirmDelete?(): Promise<boolean>;
   confirmStatusChange(itemId: number): Promise<boolean>;
   requestStatusChange(
     itemId: number,
@@ -48,6 +51,8 @@ export interface ChecklistItemEditingController {
   finishCategoryEditing(itemId: number): void;
   finishStatusEditing(itemId: number): void;
   finishTitleEditing(itemId: number): void;
+  deletionConfirmation?: number | null;
+  requestDelete?(itemId: number): void;
   startCategoryEditing(itemId: number): void;
   startStatusEditing(itemId: number): void;
   startTitleEditing(itemId: number, title: string): void;

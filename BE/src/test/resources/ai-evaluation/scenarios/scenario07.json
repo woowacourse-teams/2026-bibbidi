@@ -1,0 +1,11 @@
+{
+  "name": "scenario07",
+  "metrics": [
+    "Completeness",
+    "Coherence"
+  ],
+  "userMessage": "양가가 먼 지역에 살고 상견례 날짜가 잡혔어요. 이동과 모임 준비에 필요한 항목 두 개를 추천해 주세요.",
+  "chatMemory": [],
+  "referenceAnswer": "'상견례 장소 선택과 예약'과 '상견례 교통·숙박 준비'를 추천해 장소와 이동 요구를 모두 반영한다.",
+  "expectedRefusal": "none"
+}

@@ -1,0 +1,20 @@
+{
+  "name": "scenario24",
+  "metrics": [
+    "Coherence",
+    "Completeness"
+  ],
+  "userMessage": "그럼 내가 먼저 할 일을 하나만 추천해 줘.",
+  "chatMemory": [
+    {
+      "role": "user",
+      "content": "웨딩홀은 아직 계약하지 않았고 후보 두 곳을 둘러볼 예정이야."
+    },
+    {
+      "role": "assistant",
+      "content": "후보를 직접 비교하는 단계군요."
+    }
+  ],
+  "referenceAnswer": "계약을 완료했다고 가정하지 않고 먼저 '웨딩홀 투어'를 추천한다.",
+  "expectedRefusal": "none"
+}

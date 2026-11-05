@@ -4,6 +4,34 @@ import { createGoogleAnalyticsProvider } from "./googleAnalyticsProvider";
 describe("createGoogleAnalyticsProvider", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("콜백 이벤트에 GA의 원본 OAuth URL을 사용하지 않는다", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/auth/google?code=secret&state=secret",
+    );
+    const googleTag = vi.fn();
+    const provider = createGoogleAnalyticsProvider("G-TEST", () => googleTag);
+    provider.initialize();
+    provider.track({
+      name: "social_login_callback_failed",
+      parameters: { provider: "google", failure_kind: "cancelled" },
+    });
+    expect(googleTag).toHaveBeenLastCalledWith(
+      "event",
+      "social_login_callback_failed",
+      {
+        provider: "google",
+        failure_kind: "cancelled",
+        page_location: "http://localhost:3000/auth/callback",
+        page_referrer: "",
+        page_title: "소셜 로그인 결과",
+      },
+    );
+    expect(JSON.stringify(googleTag.mock.calls)).not.toContain("secret");
   });
 
   it("Google Tag를 한 번만 초기화하고 이벤트를 전달한다", () => {
@@ -49,7 +77,7 @@ describe("createGoogleAnalyticsProvider", () => {
       parameters: {
         page_location: "https://bibbidi.example/checklist",
         page_path: "/checklist",
-        page_referrer: "https://bibbidi.example/planner",
+        page_referrer: "https://bibbidi.example/calendar",
         page_title: "체크리스트",
         screen_name: "checklist",
       },
@@ -60,13 +88,13 @@ describe("createGoogleAnalyticsProvider", () => {
 
     expect(googleTag).toHaveBeenNthCalledWith(3, "set", {
       page_location: "https://bibbidi.example/checklist",
-      page_referrer: "https://bibbidi.example/planner",
+      page_referrer: "https://bibbidi.example/calendar",
       page_title: "체크리스트",
     });
     expect(googleTag).toHaveBeenNthCalledWith(4, "event", "page_view", {
       page_location: "https://bibbidi.example/checklist",
       page_path: "/checklist",
-      page_referrer: "https://bibbidi.example/planner",
+      page_referrer: "https://bibbidi.example/calendar",
       page_title: "체크리스트",
       screen_name: "checklist",
     });

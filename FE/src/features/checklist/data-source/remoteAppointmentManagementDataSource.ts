@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 import {
   AppointmentCreationRequest,
   AppointmentCreationResponse,
@@ -153,7 +154,7 @@ async function request(
 
   try {
     try {
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${apiBaseUrl}/api/appointments/${appointmentId}${pathSuffix}`,
         {
           ...init,

@@ -81,6 +81,10 @@ public class ChecklistRepository {
     }
 
     public ChecklistItem saveItem(Checklist checklist, ChecklistItem checklistItem) {
+        if (checklistItem.id() != null) {
+            return updateItem(checklistItem);
+        }
+
         JpaChecklistEntity checklistReference = referenceOf(checklist.id());
         JpaChecklistItemEntity entity = checklistMapper.toEntity(checklistItem, checklistReference);
 
@@ -95,6 +99,18 @@ public class ChecklistRepository {
                             + ", catalogItemId=" + checklistItem.sourceCatalogItemId()
             );
         }
+    }
+
+    private ChecklistItem updateItem(ChecklistItem checklistItem) {
+        JpaChecklistItemEntity entity = jpaChecklistItemRepository.findById(checklistItem.id())
+                .orElseThrow(() -> new BusinessException(
+                        ClientError.CHECKLIST_ITEM_NOT_FOUND,
+                        "할 일을 찾을 수 없습니다. checklistItemId=" + checklistItem.id()
+                ));
+        entity.update(checklistItem.categoryId(), checklistItem.title(), checklistItem.status());
+        jpaChecklistItemRepository.flush();
+
+        return checklistMapper.toDomain(entity);
     }
 
     public List<ChecklistItem> saveItems(Checklist checklist, List<ChecklistItem> checklistItems) {

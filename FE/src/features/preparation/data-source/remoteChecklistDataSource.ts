@@ -1,4 +1,6 @@
+import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 import type { AddedChecklistCatalogItemModel } from "../../checklist";
+import { isValidLocalDateTime } from "../../../shared/validation/isValidLocalDateTime";
 
 const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
 const MY_CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists/me`;
@@ -87,6 +89,7 @@ export function parseAddedChecklistCatalogItems(
       !isValidCatalogItemId(item.id) ||
       !isValidCatalogItemId(item.catalogItemId) ||
       !isValidCatalogItemId(item.categoryId) ||
+      !isValidLocalDateTime(item.createdAt) ||
       typeof item.title !== "string" ||
       item.status !== "prev"
     ) {
@@ -98,11 +101,51 @@ export function parseAddedChecklistCatalogItems(
     return {
       catalogItemId: item.catalogItemId,
       categoryId: item.categoryId,
+      createdAt: item.createdAt,
       id: item.id,
       status: item.status,
       title: item.title,
     };
   });
+}
+
+function parseAddedChecklistCatalogItemsResponse(
+  value: unknown,
+): AddedChecklistCatalogItemModel[] {
+  try {
+    return parseAddedChecklistCatalogItems(value);
+  } catch (error) {
+    if (
+      !(error instanceof RemoteChecklistContractError) ||
+      !isRecord(value) ||
+      !Array.isArray(value.items)
+    ) {
+      throw error;
+    }
+
+    return value.items.map((item) => {
+      if (
+        !isRecord(item) ||
+        "createdAt" in item ||
+        !isValidCatalogItemId(item.id) ||
+        !isValidCatalogItemId(item.catalogItemId) ||
+        !isValidCatalogItemId(item.categoryId) ||
+        typeof item.title !== "string" ||
+        item.status !== "prev"
+      ) {
+        throw error;
+      }
+
+      return {
+        catalogItemId: item.catalogItemId,
+        categoryId: item.categoryId,
+        createdAt: null,
+        id: item.id,
+        status: item.status,
+        title: item.title,
+      };
+    });
+  }
 }
 
 function toRequestError(
@@ -156,15 +199,18 @@ async function addCatalogItemIds(
     let response: Response;
 
     try {
-      response = await fetch(ADD_CHECKLIST_CATALOG_ITEMS_ENDPOINT, {
-        body: JSON.stringify(catalogItemIds),
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
+      response = await authenticatedFetch(
+        ADD_CHECKLIST_CATALOG_ITEMS_ENDPOINT,
+        {
+          body: JSON.stringify(catalogItemIds),
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+          signal: request.controller.signal,
         },
-        method: "POST",
-        signal: request.controller.signal,
-      });
+      );
     } catch (error) {
       throw toRequestError(error, request.didTimeout(), signal);
     }
@@ -198,7 +244,7 @@ async function addCatalogItemIds(
       );
     }
 
-    const addedItems = parseAddedChecklistCatalogItems(body);
+    const addedItems = parseAddedChecklistCatalogItemsResponse(body);
 
     if (signal?.aborted) {
       throw new RemoteChecklistRequestAbortedError();

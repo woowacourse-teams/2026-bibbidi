@@ -1,0 +1,119 @@
+.roadmap-view-picker {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+}
+
+.roadmap-view-picker__scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: rgb(23 23 23 / 40%);
+}
+
+.roadmap-view-picker__dialog {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  max-height: 90dvh;
+  margin: 0 auto;
+  padding: 8px 20px max(28px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  border-radius: 24px 24px 0 0;
+  outline: none;
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
+  box-shadow: 0 -8px 32px -8px rgb(0 0 0 / 18%);
+}
+
+.roadmap-view-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  margin-bottom: 8px;
+}
+
+.roadmap-view-picker__header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.roadmap-view-picker__header button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg-neutral-muted);
+  font: inherit;
+  font-size: 26px;
+  cursor: pointer;
+}
+
+.roadmap-view-picker__options {
+  display: grid;
+  gap: 12px;
+}
+
+.roadmap-view-picker__options button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 88px;
+  padding: 16px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 16px;
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.roadmap-view-picker__options button > span {
+  display: grid;
+  gap: 8px;
+}
+
+.roadmap-view-picker__options strong {
+  font-size: 14px;
+}
+
+.roadmap-view-picker__options button > span > span {
+  color: var(--color-fg-neutral-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.roadmap-view-picker__options button[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--color-bg-brand-weak);
+  color: var(--color-fg-brand);
+}
+
+.roadmap-view-picker__options svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.roadmap-view-picker button:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}
+
+.roadmap-view-picker .bottom-sheet-dismiss__handle-area:focus-visible {
+  outline: none;
+}

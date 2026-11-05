@@ -6,7 +6,7 @@ import {
   createChecklistTaskCompleteEvent,
   createChecklistTaskCreateEvent,
   createChecklistTaskTitleUpdateEvent,
-  createPlannerAppointmentStartEvent,
+  createCalendarAppointmentStartEvent,
 } from "./checklistAnalytics";
 
 describe("체크리스트와 일정 Analytics 이벤트", () => {
@@ -38,14 +38,14 @@ describe("체크리스트와 일정 Analytics 이벤트", () => {
     });
   });
 
-  it("플래너의 일정 추가 진입 맥락만 포함한다", () => {
-    expect(createPlannerAppointmentStartEvent()).toEqual({
-      name: "planner_appointment_start",
-      parameters: { entry_type: "unscheduled_task", source: "planner" },
+  it("캘린더의 일정 추가 진입 맥락만 포함한다", () => {
+    expect(createCalendarAppointmentStartEvent()).toEqual({
+      name: "calendar_appointment_start",
+      parameters: { entry_type: "unscheduled_task", source: "calendar" },
     });
   });
 
-  it.each(["checklist", "planner"] as const)(
+  it.each(["checklist", "calendar"] as const)(
     "%s 유입 일정 생성에 자유 형식 입력이나 식별자를 포함하지 않는다",
     (source) => {
       expect(createAppointmentCreateEvent(source)).toEqual({

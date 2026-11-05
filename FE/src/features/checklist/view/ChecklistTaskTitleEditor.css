@@ -45,10 +45,42 @@
 .checklist-title-editor__edit svg {
   width: 18px;
   height: 18px;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
+}
+
+.checklist-title-editor__menu {
+  position: absolute;
+  z-index: 20;
+  top: 34px;
+  left: 0;
+  display: grid;
+  min-width: 112px;
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 8px;
+  background: var(--color-bg-layer-default);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 12%);
+}
+
+.checklist-title-editor__menu button {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-fg-neutral);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.checklist-title-editor__menu button:hover,
+.checklist-title-editor__menu button:focus-visible {
+  background: var(--color-bg-neutral-weak);
+  outline: none;
+}
+
+.checklist-title-editor__menu .checklist-title-editor__menu-delete {
+  color: var(--color-fg-danger);
 }
 
 .checklist-title-editor__form {

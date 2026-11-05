@@ -1,0 +1,11 @@
+{
+  "name": "scenario08",
+  "metrics": [
+    "Completeness",
+    "Coherence"
+  ],
+  "userMessage": "드레스샵과 스튜디오는 골랐고 촬영을 앞두고 있어요. 의상과 촬영 분위기 준비 항목을 각각 하나씩 추천해 주세요.",
+  "chatMemory": [],
+  "referenceAnswer": "의상에는 '촬영 드레스 선택과 가봉', 분위기에는 '촬영 시안 제작'을 제안한다.",
+  "expectedRefusal": "none"
+}

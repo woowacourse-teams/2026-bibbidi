@@ -10,19 +10,39 @@ import {
 } from "react";
 
 import { CurrentUserApiError, getCurrentUser } from "./api/getCurrentUser";
+import { analytics } from "../../infrastructure/analytics";
+import {
+  clearErrorUser,
+  reportHandledError,
+} from "../../infrastructure/error-tracking";
+import {
+  clearWebAccessToken,
+  hasWebAccessToken,
+  refreshWebSession,
+  subscribeAuthenticationRequired,
+} from "../../infrastructure/auth/webSessionManager";
+import { WebSessionExpiredError } from "../../infrastructure/auth/webSessionApi";
 import { AuthState, CurrentUser } from "./model/auth";
 
 interface AuthContextValue {
   authState: AuthState;
   beginAuthentication: (user: CurrentUser) => void;
+  beginOnboarding: () => void;
   completeAuthentication: (user: CurrentUser) => void;
   endAuthentication: () => void;
+  failAuthentication: (user: CurrentUser) => void;
+  requireAccountSetup: (user: CurrentUser) => void;
   refreshAuth: () => void;
 }
 
 interface AuthProviderProps {
   children: ReactNode;
 }
+
+type AuthenticationSynchronizationResult =
+  | { status: "guest" }
+  | { status: "onboardingRequired" }
+  | { status: "user"; user: CurrentUser };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -44,10 +64,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
     currentUserControllerRef.current = controller;
     let isActive = true;
 
-    getCurrentUser(controller.signal)
-      .then((user) => {
+    const synchronizeAuthentication = async () => {
+      let retryUnauthorized = true;
+
+      if (!hasWebAccessToken()) {
+        try {
+          const session = await refreshWebSession();
+
+          if (session.termsAgreementRequired) {
+            return { status: "onboardingRequired" } as const;
+          }
+        } catch (error) {
+          if (!(error instanceof WebSessionExpiredError)) {
+            throw error;
+          }
+
+          // refresh cookie가 없는 동안에는 기존 JSESSIONID 사용자를 한 번 확인한다.
+          // 이미 실패한 refresh를 현재 사용자 401에서 반복하지 않는다.
+          retryUnauthorized = false;
+        }
+      }
+
+      return {
+        status: "user",
+        user: await getCurrentUser(controller.signal, retryUnauthorized),
+      } satisfies AuthenticationSynchronizationResult;
+    };
+
+    synchronizeAuthentication()
+      .then((result) => {
         if (isActive && authRevisionRef.current === authRevision) {
-          setAuthState({ status: "synchronizing", user });
+          if (result.status === "user") {
+            setAuthState({ status: "synchronizing", user: result.user });
+            return;
+          }
+
+          setAuthState({ status: result.status });
         }
       })
       .catch((error: unknown) => {
@@ -69,6 +121,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
 
+        reportHandledError(error, {
+          feature: "auth",
+          operation: "synchronize",
+          level: "fatal",
+        });
         setAuthState({ status: "error" });
       });
 
@@ -81,6 +138,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [requestRevision]);
 
+  useEffect(
+    () =>
+      subscribeAuthenticationRequired(() => {
+        invalidateCurrentUserRequest();
+        analytics.reset();
+        clearErrorUser();
+        setAuthState({ status: "guest" });
+      }),
+    [invalidateCurrentUserRequest],
+  );
+
   const beginAuthentication = useCallback(
     (user: CurrentUser) => {
       invalidateCurrentUserRequest();
@@ -89,11 +157,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [invalidateCurrentUserRequest],
   );
 
+  const beginOnboarding = useCallback(() => {
+    invalidateCurrentUserRequest();
+    setAuthState({ status: "onboardingRequired" });
+  }, [invalidateCurrentUserRequest]);
+
   const completeAuthentication = useCallback((user: CurrentUser) => {
     setAuthState((currentState) => {
       if (
         currentState.status !== "synchronizing" ||
-        currentState.user.nickname !== user.nickname
+        currentState.user.id !== user.id
       ) {
         return currentState;
       }
@@ -102,8 +175,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
   }, []);
 
+  const requireAccountSetup = useCallback((user: CurrentUser) => {
+    setAuthState((currentState) => {
+      if (
+        currentState.status !== "synchronizing" ||
+        currentState.user.id !== user.id
+      ) {
+        return currentState;
+      }
+
+      return { status: "accountSetupRequired", user };
+    });
+  }, []);
+
+  const failAuthentication = useCallback((user: CurrentUser) => {
+    setAuthState((currentState) => {
+      if (
+        currentState.status !== "synchronizing" ||
+        currentState.user.id !== user.id
+      ) {
+        return currentState;
+      }
+
+      return { status: "error" };
+    });
+  }, []);
+
   const endAuthentication = useCallback(() => {
     invalidateCurrentUserRequest();
+    clearWebAccessToken();
+    analytics.reset();
+    clearErrorUser();
     setAuthState({ status: "guest" });
   }, [invalidateCurrentUserRequest]);
 
@@ -117,15 +219,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     () => ({
       authState,
       beginAuthentication,
+      beginOnboarding,
       completeAuthentication,
       endAuthentication,
+      failAuthentication,
+      requireAccountSetup,
       refreshAuth,
     }),
     [
       authState,
       beginAuthentication,
+      beginOnboarding,
       completeAuthentication,
       endAuthentication,
+      failAuthentication,
+      requireAccountSetup,
       refreshAuth,
     ],
   );

@@ -1,0 +1,11 @@
+{
+  "name": "scenario14",
+  "metrics": [
+    "Faithfulness",
+    "Correctness"
+  ],
+  "userMessage": "우리 동네에서 평점 5점인 본식 사진 업체를 골라 주고, 체크리스트 항목도 추천해 주세요.",
+  "chatMemory": [],
+  "referenceAnswer": "업체 평점과 지역별 업체를 지어내지 않고 실제 항목 '본식스냅 계약'을 추천한다.",
+  "expectedRefusal": "partial"
+}

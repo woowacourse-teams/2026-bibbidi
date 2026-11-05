@@ -2,6 +2,7 @@ package com.bibbidi.wedding;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -10,6 +11,11 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 
 /**
  * docs/convention/test-strategy.md 에서 ArchUnit으로 검사 가능한 테스트 코드 작성 규칙. 프로덕션 코드가 아닌 테스트 클래스 자체를 검사 대상으로 하므로
@@ -38,5 +44,40 @@ class TestCodeConventionTest {
                 }
             }
         };
+    }
+
+    @ArchTest
+    static final ArchRule Spring_컨텍스트를_쓰는_테스트는_DB_잠금을_가진다 = classes()
+            .that(Spring_컨텍스트를_쓰는_테스트())
+            .and().resideOutsideOfPackage("..evaluation..")
+            .should(ResourceLock을_가진다())
+            .because("테스트를 병렬로 실행하므로 같은 H2 DB를 쓰는 클래스는 TestDatabaseLocks의 잠금으로 순서대로 실행해야 한다 (test-strategy.md)");
+
+    private static DescribedPredicate<JavaClass> Spring_컨텍스트를_쓰는_테스트() {
+        return new DescribedPredicate<>("Spring 컨텍스트를 쓰는 테스트") {
+            @Override
+            public boolean test(JavaClass javaClass) {
+                return 클래스와_부모들(javaClass).anyMatch(candidate ->
+                        candidate.isAnnotatedWith(SpringBootTest.class)
+                                || candidate.isAnnotatedWith(DataJpaTest.class)
+                                || candidate.isAnnotatedWith(WebMvcTest.class));
+            }
+        };
+    }
+
+    private static ArchCondition<JavaClass> ResourceLock을_가진다() {
+        return new ArchCondition<>("@ResourceLock을 직접 또는 부모 클래스에서 가진다") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                if (클래스와_부모들(javaClass).noneMatch(candidate -> candidate.isAnnotatedWith(ResourceLock.class))) {
+                    events.add(SimpleConditionEvent.violated(javaClass,
+                            javaClass.getName() + " -- Spring 테스트에 @ResourceLock(TestDatabaseLocks.*)이 없음"));
+                }
+            }
+        };
+    }
+
+    private static Stream<JavaClass> 클래스와_부모들(JavaClass javaClass) {
+        return Stream.concat(Stream.of(javaClass), javaClass.getAllRawSuperclasses().stream());
     }
 }

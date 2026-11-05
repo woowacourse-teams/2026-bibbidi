@@ -15,6 +15,8 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
     ports:
       - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8081:8081"
+    stop_grace_period: 40s
     mem_limit: 1200m
     networks:
       - bibbidi-observability
@@ -22,7 +24,7 @@ services:
       driver: json-file
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: "5"
 
   nginx:
     image: nginx:1.31.0-alpine
@@ -53,14 +55,14 @@ services:
       driver: json-file
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: "5"
 
   alloy:
     image: grafana/alloy:v1.11.0
     container_name: alloy
     restart: unless-stopped
-    env_file:
-      - ${ALLOY_ENV_FILE:-./infra/monitoring/.env.alloy}
+    labels:
+      - "kr.bibbidi.alloy-config-sha=${ALLOY_CONFIG_SHA:-unset}"
     command:
       - run
       - /etc/alloy/config.alloy
@@ -70,10 +72,12 @@ services:
     environment:
       DOCKER_HOST_URL: tcp://dockerproxy:2375
       DEPLOYMENT_ENVIRONMENT_NAME: ${DEPLOYMENT_ENVIRONMENT_NAME:-production}
+      MONITORING_INGEST_TOKEN: ${MONITORING_INGEST_TOKEN:?MONITORING_INGEST_TOKEN is required}
+      SERVICE_INSTANCE_ID: ${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod}
     depends_on:
       - dockerproxy
     volumes:
-      - ${ALLOY_CONFIG_PATH:-./infra/monitoring/alloy/config.alloy}:/etc/alloy/config.alloy:ro
+      - ${ALLOY_CONFIG_PATH:-./Infra/monitoring/grafana/alloy/config.alloy}:/etc/alloy/config.alloy:ro
       - alloy_data:/var/lib/alloy/data
     networks:
       - bibbidi-observability
@@ -95,7 +99,7 @@ services:
       driver: json-file
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: "5"
 
   dockerproxy:
     image: tecnativa/docker-socket-proxy:0.3.0
@@ -118,7 +122,7 @@ services:
       driver: json-file
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: "5"
 
 networks:
   bibbidi-observability:

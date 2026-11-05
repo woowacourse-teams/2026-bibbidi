@@ -8,11 +8,28 @@ export interface AnalyticsEvent {
 export interface AnalyticsProvider {
   initialize: () => void;
   track: (event: AnalyticsEvent) => void;
+  setContext?: (context: AnalyticsContext) => void;
+  reset?: () => void;
+}
+
+export interface AnalyticsContext {
+  authState:
+    | "loading"
+    | "guest"
+    | "onboardingRequired"
+    | "accountSetupRequired"
+    | "synchronizing"
+    | "authenticated"
+    | "error";
+  pathname: string;
+  userId?: number;
 }
 
 export interface AnalyticsClient {
   initialize: () => void;
   track: (event: AnalyticsEvent) => void;
+  setContext: (context: AnalyticsContext) => void;
+  reset: () => void;
 }
 
 function runSafely(action: () => void) {
@@ -35,6 +52,16 @@ export function createAnalyticsClient(
     track(event) {
       for (const provider of providers) {
         runSafely(() => provider.track(event));
+      }
+    },
+    setContext(context) {
+      for (const provider of providers) {
+        runSafely(() => provider.setContext?.(context));
+      }
+    },
+    reset() {
+      for (const provider of providers) {
+        runSafely(() => provider.reset?.());
       }
     },
   };

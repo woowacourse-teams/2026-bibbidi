@@ -55,13 +55,29 @@ export interface ChecklistAppointmentViewModel {
 }
 
 export interface ChecklistCategoryViewModel {
+  completedCount: number;
+  groups: ChecklistGroupViewModel[];
   id: string;
   title: string;
   countLabel: string;
   progress: number;
   progressLabel: string;
-  expanded: boolean;
   tasks: ChecklistTaskViewModel[];
+  totalCount: number;
+}
+
+export interface ChecklistGroupViewModel {
+  completedCount: number;
+  countLabel: string;
+  expanded: boolean;
+  id: string;
+  isCustom: boolean;
+  numberLabel: string;
+  progress: number;
+  progressLabel: string;
+  tasks: ChecklistTaskViewModel[];
+  title: string;
+  totalCount: number;
 }
 
 function getTaskStatus(item: ChecklistQueryItemModel): ChecklistTaskStatus {
@@ -156,46 +172,117 @@ function getTaskSchedule(item: ChecklistQueryItemModel): string {
     : formatScheduleDate(earliestDate);
 }
 
-function createChecklistCategories(checklist: ChecklistQueryModel) {
-  return checklist.categories.map((category) => ({
-    expanded: category.items.length > 0,
-    id: category.id,
-    tasks: category.items.map((item) => ({
-      appointments: item.appointments.map(createAppointmentViewModel),
-      categoryId: item.categoryId,
-      checklistItemStatus: item.status,
-      checklistItemId: item.checklistItemId,
-      id: item.id,
-      isEditable:
-        item.checklistItemId !== null && item.sourceCatalogItemId === null,
-      isStatusEditable: item.checklistItemId !== null,
-      schedule: getTaskSchedule(item),
-      status: getTaskStatus(item),
-      title: item.title,
-    })),
-    title: category.title,
-  }));
+function createTask(item: ChecklistQueryItemModel): ChecklistTaskViewModel {
+  const status = getTaskStatus(item);
+
+  return {
+    appointments: item.appointments.map(createAppointmentViewModel),
+    categoryId: item.categoryId,
+    checklistItemStatus: item.status,
+    checklistItemId: item.checklistItemId,
+    id: item.id,
+    isEditable:
+      item.checklistItemId !== null && item.sourceCatalogItemId === null,
+    isStatusEditable: item.checklistItemId !== null,
+    schedule: getTaskSchedule(item),
+    status,
+    statusLabel: statusLabels[status],
+    title: item.title,
+  };
+}
+
+function createGroup(
+  id: string,
+  title: string,
+  numberLabel: string,
+  items: ChecklistQueryItemModel[],
+  isCustom: boolean,
+): Omit<ChecklistGroupViewModel, "expanded"> {
+  const tasks = items.map(createTask);
+  const completedCount = tasks.filter(
+    (task) => task.status === "complete",
+  ).length;
+  const progress = calculateChecklistProgress(tasks);
+
+  return {
+    completedCount,
+    countLabel: `${completedCount}/${tasks.length}`,
+    id,
+    isCustom,
+    numberLabel,
+    progress,
+    progressLabel: `${progress}%`,
+    tasks,
+    title,
+    totalCount: tasks.length,
+  };
 }
 
 export function createChecklistViewModel(
   checklist: ChecklistQueryModel,
 ): ChecklistCategoryViewModel[] {
-  const categories = createChecklistCategories(checklist);
+  return checklist.categories.map((category) => {
+    const steps = category.steps
+      ? category.steps
+      : category.items.length > 0
+        ? [
+            {
+              id: `${category.id}-legacy`,
+              items: category.items,
+              order: 1,
+              title: category.title,
+            },
+          ]
+        : [];
+    const groups = steps
+      .filter((step) => step.items.length > 0)
+      .map((step) =>
+        createGroup(
+          step.id,
+          step.title,
+          String(step.order).padStart(2, "0"),
+          step.items,
+          false,
+        ),
+      );
 
-  return categories.map((category) => {
-    const progress = calculateChecklistProgress(category.tasks);
+    const customItems = category.customItems;
+
+    if (customItems && customItems.length > 0) {
+      groups.push(
+        createGroup(
+          `${category.id}-custom`,
+          "내가 추가한 일",
+          "+",
+          customItems,
+          true,
+        ),
+      );
+    }
+
+    const defaultExpandedGroup =
+      groups.find((group) => group.completedCount < group.totalCount) ??
+      groups[0];
+    const groupsWithExpansion = groups.map((group) => ({
+      ...group,
+      expanded: group.id === defaultExpandedGroup?.id,
+    }));
+    const tasks = groupsWithExpansion.flatMap((group) => group.tasks);
+    const completedCount = tasks.filter(
+      (task) => task.status === "complete",
+    ).length;
+    const progress = calculateChecklistProgress(tasks);
 
     return {
+      completedCount,
       id: category.id,
       title: category.title,
-      countLabel: `${category.tasks.length}개`,
+      countLabel: `${completedCount}/${tasks.length}`,
+      groups: groupsWithExpansion,
       progress,
       progressLabel: `${progress}%`,
-      expanded: category.expanded,
-      tasks: category.tasks.map((task) => ({
-        ...task,
-        statusLabel: statusLabels[task.status],
-      })),
+      tasks,
+      totalCount: tasks.length,
     };
   });
 }

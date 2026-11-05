@@ -256,6 +256,7 @@ describe("MyChecklistCommandRepository 일정 관리", () => {
             },
           ],
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 500,
           sourceCatalogItemId: null,
           status: "continue",
@@ -286,6 +287,7 @@ describe("MyChecklistCommandRepository 일정 관리", () => {
         {
           appointments: [{ ...appointmentRequest, id: 11, isDone: false }],
           categoryId: 1,
+          createdAt: "2026-09-23T09:00:00",
           id: 500,
           sourceCatalogItemId: null,
           status: "continue",
@@ -339,6 +341,7 @@ describe("MyChecklistCommandRepository", () => {
       vi.mocked(dataSource.changeChecklistItemStatus).mockResolvedValue({
         catalogItemId: null,
         categoryId: 2,
+        createdAt: "2026-09-23T09:00:00",
         id: 500,
         status,
         title: "청첩장 문구 정하기",
@@ -367,6 +370,7 @@ describe("MyChecklistCommandRepository", () => {
     vi.mocked(dataSource.changeChecklistItemStatus).mockResolvedValue({
       catalogItemId: null,
       categoryId: 2,
+      createdAt: "2026-09-23T09:00:00",
       id: 500,
       status: "done",
       title: "청첩장 문구 정하기",
@@ -447,6 +451,7 @@ describe("MyChecklistCommandRepository", () => {
     vi.mocked(dataSource.changeChecklistItemCategory).mockResolvedValue({
       catalogItemId: null,
       categoryId: 3,
+      createdAt: "2026-09-23T09:00:00",
       id: 500,
       status: "continue",
       title: "청첩장 문구 정하기",
@@ -516,6 +521,7 @@ describe("MyChecklistCommandRepository", () => {
     vi.mocked(dataSource.changeChecklistItemTitle).mockResolvedValue({
       catalogItemId: null,
       categoryId: 2,
+      createdAt: "2026-09-23T09:00:00",
       id: 500,
       status: "continue",
       title: "청첩장 문구 최종 확정",
@@ -639,6 +645,7 @@ describe("MyChecklistCommandRepository", () => {
     vi.mocked(dataSource.changeChecklistItemTitle).mockResolvedValueOnce({
       catalogItemId: null,
       categoryId: 2,
+      createdAt: "2026-09-23T09:00:00",
       id: 500,
       status: "prev",
       title: "새 제목",
@@ -655,6 +662,7 @@ describe("MyChecklistCommandRepository", () => {
     vi.mocked(dataSource.createCustomChecklistItem).mockResolvedValue({
       catalogItemId: null,
       categoryId: 2,
+      createdAt: "2026-09-23T09:00:00",
       id: 501,
       status: "done",
       title: "청첩장 문구 정하기",
@@ -678,6 +686,7 @@ describe("MyChecklistCommandRepository", () => {
       {
         appointments: [],
         categoryId: 2,
+        createdAt: "2026-09-23T09:00:00",
         id: 501,
         sourceCatalogItemId: null,
         status: "done",
@@ -724,6 +733,7 @@ describe("MyChecklistCommandRepository", () => {
       .mockResolvedValueOnce({
         catalogItemId: null,
         categoryId: 2,
+        createdAt: "2026-09-23T09:00:00",
         id: 501,
         status: "prev",
         title: "새 할 일",
