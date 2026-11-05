@@ -4,6 +4,17 @@
 	classes = {};
 	objectVersion = 56;
 	objects = {
+
+        000000000000000000000040 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KakaoLoginView.swift; sourceTree = "<group>"; };
+        000000000000000000000041 = { isa = PBXBuildFile; fileRef = 000000000000000000000040; };
+        000000000000000000000050 = { isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/kakao/kakao-ios-sdk"; requirement = { kind = exactVersion; version = 2.26.0; }; };
+        000000000000000000000060 = { isa = XCSwiftPackageProductDependency; package = 000000000000000000000050; productName = KakaoSDKUser; };
+        000000000000000000000070 = { isa = PBXBuildFile; productRef = 000000000000000000000060; };
+        000000000000000000000061 = { isa = XCSwiftPackageProductDependency; package = 000000000000000000000050; productName = KakaoSDKAuth; };
+        000000000000000000000071 = { isa = PBXBuildFile; productRef = 000000000000000000000061; };
+        000000000000000000000062 = { isa = XCSwiftPackageProductDependency; package = 000000000000000000000050; productName = KakaoSDKCommon; };
+        000000000000000000000072 = { isa = PBXBuildFile; productRef = 000000000000000000000062; };
+
 		000000000000000000000030 = { isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Dev.xcconfig; sourceTree = "<group>"; };
 		000000000000000000000031 = { isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Prod.xcconfig; sourceTree = "<group>"; };
 		000000000000000000000032 = { isa = PBXGroup; children = (000000000000000000000030, 000000000000000000000031); name = Config; path = config; sourceTree = "<group>"; };
@@ -24,16 +35,16 @@
 		000000000000000000000006 = { isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		000000000000000000000007 = { isa = PBXFileReference; explicitFileType = wrapper.application; path = Bibbidi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000008 = { isa = PBXBuildFile; fileRef = 000000000000000000000005; };
-		000000000000000000000003 = { isa = PBXGroup; children = (000000000000000000000005, 000000000000000000000006); path = iosApp; sourceTree = "<group>"; };
+		000000000000000000000003 = { isa = PBXGroup; children = (000000000000000000000040,000000000000000000000005, 000000000000000000000006); path = iosApp; sourceTree = "<group>"; };
 		000000000000000000000004 = { isa = PBXGroup; children = (000000000000000000000007, 000000000000000000000022); name = Products; sourceTree = "<group>"; };
 		000000000000000000000002 = { isa = PBXGroup; children = (000000000000000000000032, 000000000000000000000003, 000000000000000000000024, 000000000000000000000004); sourceTree = "<group>"; };
-		00000000000000000000000A = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000008); runOnlyForDeploymentPostprocessing = 0; };
-		00000000000000000000000B = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		00000000000000000000000A = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000041,000000000000000000000008); runOnlyForDeploymentPostprocessing = 0; };
+		00000000000000000000000B = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000070,000000000000000000000071,000000000000000000000072); runOnlyForDeploymentPostprocessing = 0; };
 		00000000000000000000000C = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		00000000000000000000000D = { isa = PBXShellScriptBuildPhase; alwaysOutOfDate = 1; buildActionMask = 2147483647; files = (); inputPaths = (); outputPaths = (); name = "Build shared framework"; runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/sh; shellScript = "set -eu\nif [ \"YES\" = \"${OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED:-NO}\" ]; then\n    exit 0\nfi\ncd \"$SRCROOT/..\"\nif [ -z \"${JAVA_HOME:-}\" ]; then\n    export JAVA_HOME=$(/usr/libexec/java_home -v 25)\nfi\n./gradlew :shared:embedAndSignAppleFrameworkForXcode\n"; };
-		000000000000000000000009 = { isa = PBXNativeTarget; buildConfigurationList = 00000000000000000000000F; buildPhases = (00000000000000000000000D, 00000000000000000000000A, 00000000000000000000000B, 00000000000000000000000C); buildRules = (); dependencies = (); name = Bibbidi; productName = Bibbidi; productReference = 000000000000000000000007; productType = "com.apple.product-type.application"; };
-		000000000000000000000001 = { isa = PBXProject; attributes = { BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2600; }; buildConfigurationList = 00000000000000000000000E; compatibilityVersion = "Xcode 14.0"; developmentRegion = ko; hasScannedForEncodings = 0; knownRegions = (ko, en, Base); mainGroup = 000000000000000000000002; productRefGroup = 000000000000000000000004; projectDirPath = ""; projectRoot = ""; targets = (000000000000000000000009, 000000000000000000000020); };
-		000000000000000000000010 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; KOTLIN_FRAMEWORK_BUILD_TYPE = Debug; DEBUG_INFORMATION_FORMAT = dwarf; }; name = Debug; };
+		000000000000000000000009 = { isa = PBXNativeTarget; buildConfigurationList = 00000000000000000000000F; buildPhases = (00000000000000000000000D, 00000000000000000000000A, 00000000000000000000000B, 00000000000000000000000C); buildRules = (); dependencies = (); name = Bibbidi; packageProductDependencies = (000000000000000000000060,000000000000000000000061,000000000000000000000062); productName = Bibbidi; productReference = 000000000000000000000007; productType = "com.apple.product-type.application"; };
+		000000000000000000000001 = { isa = PBXProject; attributes = { BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2600; }; buildConfigurationList = 00000000000000000000000E; compatibilityVersion = "Xcode 14.0"; developmentRegion = ko; hasScannedForEncodings = 0; knownRegions = (ko, en, Base); packageReferences = (000000000000000000000050); mainGroup = 000000000000000000000002; productRefGroup = 000000000000000000000004; projectDirPath = ""; projectRoot = ""; targets = (000000000000000000000009, 000000000000000000000020); };
+		000000000000000000000010 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; KOTLIN_FRAMEWORK_BUILD_TYPE = Debug; ONLY_ACTIVE_ARCH = YES; DEBUG_INFORMATION_FORMAT = dwarf; }; name = Debug; };
 		000000000000000000000011 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; KOTLIN_FRAMEWORK_BUILD_TYPE = Release; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; }; name = Release; };
 		000000000000000000000033 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; KOTLIN_FRAMEWORK_BUILD_TYPE = Release; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; }; name = DevRelease; };
 		000000000000000000000012 = { isa = XCBuildConfiguration; baseConfigurationReference = 000000000000000000000030; buildSettings = { CODE_SIGN_STYLE = Automatic;

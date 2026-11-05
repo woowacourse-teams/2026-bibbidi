@@ -3,3 +3,7 @@ APP_DEV_API_HOST = dev-api.example.invalid
 APP_DEV_WEB_HOST = dev-web.example.invalid
 APP_PROD_API_HOST = api.example.invalid
 APP_PROD_WEB_HOST = web.example.invalid
+
+// Kakao SDK native app keys. Leave empty until the provider app is registered.
+APP_DEV_KAKAO_NATIVE_APP_KEY =
+APP_PROD_KAKAO_NATIVE_APP_KEY =
