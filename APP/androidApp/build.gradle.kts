@@ -27,6 +27,13 @@ val devWebHost = configuredHost("APP_DEV_WEB_HOST")
 val prodApiHost = configuredHost("APP_PROD_API_HOST")
 val prodWebHost = configuredHost("APP_PROD_WEB_HOST")
 
+fun kakaoAppKey(environment: String): String {
+    val name = "APP_${environment}_KAKAO_NATIVE_APP_KEY"
+    val value = providers.environmentVariable(name).orNull ?: localSettings.getProperty(name).orEmpty()
+    require(value.isEmpty() || value.matches(Regex("[A-Za-z0-9_-]+"))) { "Invalid Kakao app key setting: $name" }
+    return value
+}
+
 val releaseSigning = listOf(
     "ANDROID_KEYSTORE_PATH", "ANDROID_STORE_PASSWORD", "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD",
 ).associateWith { providers.environmentVariable(it).orNull }
@@ -54,6 +61,9 @@ android {
     productFlavors {
         create("dev") {
             dimension = "environment"
+            val kakaoKey = kakaoAppKey("DEV")
+            buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"$kakaoKey\"")
+            manifestPlaceholders["kakaoScheme"] = "kakao${kakaoKey.ifEmpty { "unconfigured" }}"
             applicationIdSuffix = ".dev"
             resValue("string", "app_name", "비비디 개발")
             buildConfigField("String", "ENVIRONMENT", "\"dev\"")
@@ -64,6 +74,9 @@ android {
         }
         create("prod") {
             dimension = "environment"
+            val kakaoKey = kakaoAppKey("PROD")
+            buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"$kakaoKey\"")
+            manifestPlaceholders["kakaoScheme"] = "kakao${kakaoKey.ifEmpty { "unconfigured" }}"
             resValue("string", "app_name", "비비디")
             buildConfigField("String", "ENVIRONMENT", "\"prod\"")
             buildConfigField("String", "API_BASE_URL", "\"https://$prodApiHost\"")
@@ -120,6 +133,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(libs.kakao.user)
     testImplementation(libs.kotlin.test.junit)
     implementation(project(":shared"))
     implementation(platform(libs.androidx.compose.bom))

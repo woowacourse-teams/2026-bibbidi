@@ -3,8 +3,10 @@ kotlin = "2.3.21"
 agp = "9.0.0"
 composeBom = "2025.10.01"
 activityCompose = "1.11.0"
+kakao = "2.26.0"
 
 [libraries]
+kakao-user = { module = "com.kakao.sdk:v2-user", version.ref = "kakao" }
 androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
 androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }

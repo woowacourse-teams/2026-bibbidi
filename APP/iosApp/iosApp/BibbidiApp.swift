@@ -1,5 +1,6 @@
 import Shared
 import SwiftUI
+import KakaoSDKAuth
 
 @main
 struct BibbidiApp: App {
@@ -22,10 +23,14 @@ struct BibbidiApp: App {
         )
     }()
 
+    init() { KakaoLoginModel.configure() }
+
     var body: some Scene {
         WindowGroup {
-            Text(AppInfo.shared.name)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            KakaoLoginView()
+                .onOpenURL { url in
+                    if AuthApi.isKakaoTalkLoginUrl(url) { _ = AuthController.handleOpenUrl(url: url) }
+                }
         }
     }
 }
