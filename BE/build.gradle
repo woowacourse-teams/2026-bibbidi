@@ -13,6 +13,7 @@ plugins {
     id 'com.epages.restdocs-api-spec' version '0.20.0'
     id 'org.hidetake.swagger.generator' version '2.19.2'
     id 'jacoco'
+    id 'info.solidsoft.pitest' version '1.19.0'
 }
 
 group = 'com.bibbidi'
@@ -65,6 +66,7 @@ dependencies {
 
 apply from: 'gradle/documentation.gradle'
 apply from: 'gradle/jacoco.gradle'
+apply from: 'gradle/pitest.gradle'
 
 // Docker 유무에 따라 MySQL 마이그레이션 테스트가 실행되거나 건너뛰어지므로 캐시 키에 넣는다.
 def dockerAvailable = providers.provider {
