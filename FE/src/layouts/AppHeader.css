@@ -36,7 +36,6 @@
 }
 
 .app-header__navigation-item {
-  position: relative;
   display: inline-flex;
   height: 100%;
   align-items: center;
@@ -48,17 +47,7 @@
 }
 
 .app-header__navigation-item[aria-current="page"] {
-  color: var(--color-fg-neutral);
-}
-
-.app-header__navigation-item[aria-current="page"]::after {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 3px;
-  background: var(--color-bg-brand-solid);
-  content: "";
+  color: var(--color-fg-brand);
 }
 
 .app-header__right {
@@ -178,8 +167,7 @@
   border: 0;
 }
 
-.app-header__login,
-.app-header__signup {
+.app-header__login {
   position: relative;
   display: inline-flex;
   min-width: auto;
@@ -194,21 +182,9 @@
   text-decoration: none;
 }
 
-.app-header__login:hover,
-.app-header__signup:hover {
+.app-header__login:hover {
   background: var(--color-bg-neutral-weak);
   color: var(--color-fg-neutral);
-}
-
-.app-header__signup::before {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 1px;
-  height: 14px;
-  background: var(--color-stroke-neutral-weak);
-  content: "";
-  transform: translateY(-50%);
 }
 
 .app-header a:focus-visible,
@@ -275,8 +251,7 @@
     height: 32px;
   }
 
-  .app-header__login,
-  .app-header__signup {
+  .app-header__login {
     padding: 0 9px;
     font-size: 13px;
   }

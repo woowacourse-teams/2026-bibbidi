@@ -9,7 +9,7 @@ FROM eclipse-temurin:25-jre-noble
 WORKDIR /app
 COPY --from=build /workspace/build/libs/app.jar /app/app.jar
 
-EXPOSE 8080
+EXPOSE 8080 8081
 
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=60.0"
 

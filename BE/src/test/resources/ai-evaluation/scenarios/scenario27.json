@@ -1,0 +1,11 @@
+{
+  "name": "scenario27",
+  "metrics": [
+    "Relevance",
+    "Helpfulness"
+  ],
+  "userMessage": "신랑 예복 준비 항목만 두 개 추천해 주세요.",
+  "chatMemory": [],
+  "referenceAnswer": "'예복 맞춤·기성·대여 결정'과 '예복 상담과 계약' 등 예복 항목에 집중한다.",
+  "expectedRefusal": "none"
+}

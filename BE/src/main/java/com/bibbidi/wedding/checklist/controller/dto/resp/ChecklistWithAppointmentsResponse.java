@@ -25,12 +25,18 @@ public record ChecklistWithAppointmentsResponse(
             Long sourceCatalogItemId,
             String title,
             String status,
+            LocalDateTime createdAt,
             List<AppointmentSummaryResponse> appointments
     ) {
         private static ChecklistItemWithAppointmentsResponse from(ChecklistItemWithAppointmentsResult result) {
             return new ChecklistItemWithAppointmentsResponse(
-                    result.id(), result.categoryId(), result.sourceCatalogItemId(), result.title(),
-                    result.status().value(), result.appointments().stream().map(AppointmentSummaryResponse::from).toList()
+                    result.id(),
+                    result.categoryId(),
+                    result.sourceCatalogItemId(),
+                    result.title(),
+                    result.status().value(),
+                    result.createdAt(),
+                    result.appointments().stream().map(AppointmentSummaryResponse::from).toList()
             );
         }
     }

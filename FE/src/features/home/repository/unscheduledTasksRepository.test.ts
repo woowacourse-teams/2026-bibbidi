@@ -40,11 +40,10 @@ function createDataSource(
 }
 
 describe("createUnscheduledTasksRepository", () => {
-  it("limit 3을 전달하고 API 순서와 표시 데이터를 보존한다", async () => {
+  it("limit 2를 전달하고 API 순서와 표시 데이터를 보존한다", async () => {
     const dataSource = createDataSource([
       createTask({ checklistItemId: 44, status: "continue" }),
       createTask({ checklistItemId: 31, title: "웨딩홀 투어" }),
-      createTask({ checklistItemId: 52, title: "식순 준비" }),
     ]);
     const repository = createUnscheduledTasksRepository(dataSource);
     const controller = new AbortController();
@@ -64,15 +63,9 @@ describe("createUnscheduledTasksRepository", () => {
         status: "prev",
         title: "웨딩홀 투어",
       },
-      {
-        category: "웨딩홀",
-        id: 52,
-        status: "prev",
-        title: "식순 준비",
-      },
     ]);
     expect(dataSource.getUnscheduledTasks).toHaveBeenCalledWith(
-      3,
+      2,
       controller.signal,
     );
   });

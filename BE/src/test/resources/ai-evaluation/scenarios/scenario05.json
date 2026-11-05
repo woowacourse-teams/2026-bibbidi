@@ -1,0 +1,11 @@
+{
+  "name": "scenario05",
+  "metrics": [
+    "Correctness",
+    "Faithfulness"
+  ],
+  "userMessage": "결혼반지는 아직 알아보지 않았어요. 바로 반지 계약을 추천하기 전에 살펴볼 카탈로그 항목이 있나요?",
+  "chatMemory": [],
+  "referenceAnswer": "실제 항목 '웨딩밴드 투어'를 먼저 추천하고 그다음 '결혼반지 선택' 또는 '웨딩밴드 계약'으로 이어지는 순서를 설명한다.",
+  "expectedRefusal": "none"
+}

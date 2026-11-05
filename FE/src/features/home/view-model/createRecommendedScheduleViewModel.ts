@@ -1,5 +1,5 @@
 import type { RecommendedCatalogItemListModel } from "../model/recommendedCatalogItem";
-import type { RecommendedTaskAdditionState } from "../model/recommendedTaskAddition";
+import type { CatalogTaskAdditionState } from "../../preparation/model/catalogTaskAddition";
 
 export interface RecommendedScheduleItemViewModel {
   addActionLabel: string;
@@ -19,10 +19,10 @@ export interface RecommendedScheduleViewModel {
 
 export function createRecommendedScheduleViewModel(
   model: RecommendedCatalogItemListModel,
-  addition: RecommendedTaskAdditionState,
+  addition: CatalogTaskAdditionState,
 ): RecommendedScheduleViewModel {
   return {
-    catalogActionLabel: "준비 목록 보기",
+    catalogActionLabel: "로드맵 보기",
     items: model.items.map((item) => {
       const isAdding = addition.addingCatalogItemIds.includes(
         item.catalogItemId,

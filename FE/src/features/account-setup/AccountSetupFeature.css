@@ -1,0 +1,132 @@
+.account-setup {
+  display: flex;
+  width: min(100%, 420px);
+  flex-direction: column;
+  gap: 20px;
+}
+
+.account-setup__title {
+  margin: 0;
+  color: var(--color-fg-neutral);
+  font-size: 24px;
+  line-height: 1.4;
+}
+
+.account-setup__description,
+.account-setup__message,
+.account-setup__error {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.account-setup__description,
+.account-setup__message {
+  color: var(--color-fg-neutral-muted);
+}
+
+.account-setup__choices,
+.account-setup__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.account-setup__choice {
+  display: flex;
+  min-height: 92px;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 12px;
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
+  cursor: pointer;
+  text-align: left;
+}
+
+.account-setup__choice:not(:disabled):hover {
+  border-color: var(--color-stroke-brand-solid);
+}
+
+.account-setup__choice:focus-visible,
+.account-setup__primary-button:focus-visible,
+.account-setup__secondary-button:focus-visible,
+.account-setup__input:focus-visible {
+  outline: 3px solid var(--color-stroke-focus-ring);
+  outline-offset: 2px;
+}
+
+.account-setup__choice strong {
+  font-size: 16px;
+}
+
+.account-setup__choice span {
+  color: var(--color-fg-neutral-muted);
+  font-size: 14px;
+}
+
+.account-setup__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-setup__label {
+  color: var(--color-fg-neutral);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.account-setup__input {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  border-radius: 10px;
+  background: var(--color-bg-layer-default);
+  color: var(--color-fg-neutral);
+  font: inherit;
+}
+
+.account-setup__primary-button,
+.account-setup__secondary-button {
+  min-height: 48px;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.account-setup__primary-button {
+  border: 0;
+  background: var(--color-bg-brand-solid);
+  color: var(--color-fg-on-brand);
+}
+
+.account-setup__secondary-button {
+  width: 100%;
+  border: 1px solid var(--color-stroke-neutral-weak);
+  background: transparent;
+  color: var(--color-fg-neutral-muted);
+}
+
+.account-setup__primary-button:disabled,
+.account-setup__secondary-button:disabled,
+.account-setup__choice:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.account-setup__message--error,
+.account-setup__error {
+  color: var(--color-fg-critical);
+}
+
+.account-setup__switch-account {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

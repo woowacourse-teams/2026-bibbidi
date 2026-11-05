@@ -9,6 +9,11 @@ public class BusinessException extends RuntimeException {
         this.clientError = clientError;
     }
 
+    public BusinessException(ClientError clientError, String logMessage, Throwable cause) {
+        super(logMessage, cause);
+        this.clientError = clientError;
+    }
+
     public ClientError clientError() {
         return clientError;
     }

@@ -9,7 +9,12 @@ interface HeaderBrandLinkProps {
 
 export function HeaderBrandLink({ to }: HeaderBrandLinkProps) {
   return (
-    <Link aria-label="비비디 홈" className="header-brand-link" to={to}>
+    <Link
+      aria-label="비비디 홈"
+      className="header-brand-link"
+      draggable={false}
+      to={to}
+    >
       <BibidiBrand />
     </Link>
   );

@@ -304,7 +304,8 @@ class ChecklistTest {
                 2L,
                 "계약서 확인",
                 sourceCatalogItemId,
-                status
+                status,
+                null
         );
     }
 

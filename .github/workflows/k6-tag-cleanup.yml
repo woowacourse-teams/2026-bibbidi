@@ -1,0 +1,35 @@
+name: 비비디 k6 태그 정리
+
+on:
+  schedule:
+    - cron: "0 18 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 지우지 않고 대상만 확인한다
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: k6-tag-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.19.0
+
+      - name: k6 태그 지우기
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
+        run: node --experimental-strip-types .github/k6-tag-cleanup/cli.ts

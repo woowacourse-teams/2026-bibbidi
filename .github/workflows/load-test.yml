@@ -1,0 +1,132 @@
+name: 비비디 부하 테스트
+
+on:
+  push:
+    tags:
+      - "k6/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: load-test
+  cancel-in-progress: false
+
+jobs:
+  k6:
+    if: startsWith(github.ref_name, 'k6/dev/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: backend-dev
+    env:
+      REF_NAME: ${{ github.ref_name }}
+      REPORT_DIR: ${{ github.workspace }}/k6-report
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 태그에서 실행 대상 읽기
+        run: |
+          set -euo pipefail
+          if [[ ! "$REF_NAME" =~ ^k6/(dev)/(smoke-test|smoke-ai-test|breakpoint-general-test|breakpoint-ai-arrival-test|breakpoint-ai-concurrency-test)/([A-Za-z0-9._-]+)$ ]]; then
+            echo "::error::태그 형식이 k6/dev/<스크립트>/<회차>와 맞지 않거나 허용하지 않는 스크립트입니다: $REF_NAME"
+            exit 1
+          fi
+          needs_sse=false
+          case "${BASH_REMATCH[2]}" in
+            smoke-ai-test|breakpoint-ai-*) needs_sse=true ;;
+          esac
+          {
+            echo "TARGET_LABEL=${BASH_REMATCH[1]}-test"
+            echo "SCRIPT=${BASH_REMATCH[2]}"
+            echo "TEST_ID=${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
+            echo "NEEDS_SSE=$needs_sse"
+          } >> "$GITHUB_ENV"
+
+      - uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: 2.2.0
+
+      - uses: actions/setup-go@v6
+        if: env.NEEDS_SSE == 'true'
+        with:
+          go-version: "1.26"
+
+      - name: SSE 확장이 들어간 k6 빌드
+        if: env.NEEDS_SSE == 'true'
+        run: |
+          set -euo pipefail
+          go install go.k6.io/xk6/cmd/xk6@v1.4.14
+          "$(go env GOPATH)/bin/xk6" build v2.2.0             --with github.com/phymbert/xk6-sse@v0.2.0             --output "$RUNNER_TEMP/k6-sse"
+          "$RUNNER_TEMP/k6-sse" version
+          echo "K6_BIN=$RUNNER_TEMP/k6-sse" >> "$GITHUB_ENV"
+
+      - name: 기존 시크릿에서 필요한 값만 꺼내기
+        env:
+          SPRING_ENV_CONTENT: ${{ secrets.BIBBIDI_SPRING_ENV }}
+          NGINX_ENV_CONTENT: ${{ secrets.BIBBIDI_NGINX_ENV }}
+          ALLOY_ENV_CONTENT: ${{ secrets.BIBBIDI_ALLOY_ENV }}
+        run: |
+          set -euo pipefail
+          pick() {
+            printf '%s\n' "$1" \
+              | tr -d '\r' \
+              | sed -n -E "s/^(export )?$2=//p" \
+              | head -n 1 \
+              | sed -E "s/^(\"|')//; s/(\"|')$//"
+          }
+          jwt_secret="$(pick "$SPRING_ENV_CONTENT" AUTH_JWT_SECRET)"
+          server_name="$(pick "$NGINX_ENV_CONTENT" SERVER_NAME)"
+          server_name="${server_name:-$(pick "$NGINX_ENV_CONTENT" CERT_DOMAIN)}"
+          ingest_token="$(pick "$ALLOY_ENV_CONTENT" MONITORING_INGEST_TOKEN)"
+          for secret in "$jwt_secret" "$ingest_token"; do
+            if [ -n "$secret" ]; then echo "::add-mask::$secret"; fi
+          done
+          test -n "$jwt_secret" || { echo "::error::BIBBIDI_SPRING_ENV에서 AUTH_JWT_SECRET을 찾지 못했습니다."; exit 1; }
+          test -n "$server_name" || { echo "::error::BIBBIDI_NGINX_ENV에서 SERVER_NAME과 CERT_DOMAIN을 모두 찾지 못했습니다."; exit 1; }
+          test -n "$ingest_token" || { echo "::error::BIBBIDI_ALLOY_ENV에서 MONITORING_INGEST_TOKEN을 찾지 못했습니다."; exit 1; }
+          {
+            echo "AUTH_JWT_SECRET=$jwt_secret"
+            echo "BASE_URL=https://$server_name"
+            echo "K6_PROMETHEUS_RW_BEARER_TOKEN=$ingest_token"
+          } >> "$GITHUB_ENV"
+
+      - name: k6 실행
+        env:
+          K6_NO_USAGE_REPORT: "true"
+          K6_SYSTEM_TAGS: proto,status,method,name,group,check,error,error_code,tls_version,scenario,expected_response
+          K6_PROMETHEUS_RW_SERVER_URL: https://monitoring.bibbidi.kr/prometheus/api/v1/write
+          K6_PROMETHEUS_RW_TREND_STATS: p(95),p(99),avg,max
+          K6_PROMETHEUS_RW_LABELS: target=${{ env.TARGET_LABEL }}
+          K6_PROMETHEUS_RW_STALE_MARKERS: "true"
+          K6_PROMETHEUS_RW_PUSH_INTERVAL: 1s
+          K6_WEB_DASHBOARD: "true"
+          K6_WEB_DASHBOARD_PORT: "-1"
+          K6_WEB_DASHBOARD_EXPORT: ${{ env.REPORT_DIR }}/report.html
+          SUMMARY_DIR: ${{ env.REPORT_DIR }}
+        run: |
+          mkdir -p "$REPORT_DIR"
+          set +e
+          "${K6_BIN:-k6}" run -o experimental-prometheus-rw --tag "testid=$TEST_ID" "Infra/k6/$SCRIPT.ts"
+          status=$?
+          set -e
+          if [ "$status" -eq 99 ] && [[ "$SCRIPT" == breakpoint-* ]]; then
+            echo "임계값 중단은 Breakpoint의 정상 결과입니다."
+            exit 0
+          fi
+          exit "$status"
+
+      - name: 잡 요약에 판정표 남기기
+        if: always()
+        run: |
+          if [ -f "$REPORT_DIR/report.md" ]; then
+            cat "$REPORT_DIR/report.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: 보고서 아티팩트 올리기
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: k6-${{ env.TEST_ID }}
+          path: ${{ env.REPORT_DIR }}
+          retention-days: 90
+          if-no-files-found: warn
