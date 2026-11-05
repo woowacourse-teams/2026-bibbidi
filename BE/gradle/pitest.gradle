@@ -1,0 +1,57 @@
+// Spring Boot가 관리하는 JUnit Platform 6.0.3에 PIT launcher 버전을 맞춘다.
+configurations.testRuntimeClasspath.resolutionStrategy.eachDependency { details ->
+    if (details.requested.group == 'org.junit.platform'
+            && details.requested.name == 'junit-platform-launcher') {
+        details.useVersion '6.0.3'
+    }
+}
+
+pitest {
+    pitestVersion = '1.30.1'
+    junit5PluginVersion = '1.2.3'
+    targetClasses = (findProperty('pitestTargetClasses') ?: 'com.bibbidi.wedding.*').split(',') as List
+    targetTests = (findProperty('pitestTargetTests') ?: 'com.bibbidi.wedding.*').split(',') as List
+    excludedTestClasses = ['com.bibbidi.wedding.chat.evaluation.BibbidiEvaluationIntegrationTest']
+    outputFormats = ['HTML', 'XML']
+    timestampedReports = false
+    threads = 4
+    mutationThreshold = 90
+}
+
+// CI와 로컬에서 같은 방식으로 변경된 운영 코드만 변이 검사한다.
+if (providers.gradleProperty('pitestChanged').map { it.toBoolean() }.getOrElse(false)) {
+    def gitLines = { List<String> args ->
+        def process = new ProcessBuilder((['git', '-C', rootDir.absolutePath] + args)
+                .collect { it.toString() })
+                .redirectErrorStream(true)
+                .start()
+        def output = process.inputStream.getText('UTF-8')
+        if (process.waitFor() != 0) {
+            throw new GradleException("변경된 PIT 대상을 찾지 못했습니다: ${output.trim()}")
+        }
+        output.readLines()
+    }
+
+    def changedClasses = providers.provider {
+        def baseRef = providers.gradleProperty('pitestBaseRef').getOrElse('dev-be')
+        def sourcePath = 'BE/src/main/java/'
+        def sourcePaths = (
+                gitLines(['diff', '--name-only', '--diff-filter=ACMR', "${baseRef}...HEAD", '--', 'src/main/java']) +
+                gitLines(['diff', '--name-only', '--diff-filter=ACMR', 'HEAD', '--', 'src/main/java']) +
+                gitLines(['ls-files', '--others', '--exclude-standard', '--', 'src/main/java'])
+        ).toSet()
+        sourcePaths.findAll { it.startsWith(sourcePath) && it.endsWith('.java') }
+                .collect { it.substring(sourcePath.length(), it.length() - '.java'.length())
+                        .replace('/', '.') }
+                .sort()
+    }
+
+    pitest.targetClasses = changedClasses
+    tasks.named('pitest') {
+        onlyIf {
+            def classes = changedClasses.get()
+            logger.lifecycle("PIT 변경 대상: ${classes ? classes.join(', ') : '없음'}")
+            !classes.isEmpty()
+        }
+    }
+}
