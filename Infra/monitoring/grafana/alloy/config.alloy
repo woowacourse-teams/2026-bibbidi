@@ -62,7 +62,7 @@ loki.source.docker "containers" {
 
 loki.process "normalize" {
   stage.match {
-    selector = "{service_name=\"dockerproxy\"}"
+    selector = "{service_name=~\"dockerproxy|prometheus-discovery\"}"
     action   = "drop"
   }
 
