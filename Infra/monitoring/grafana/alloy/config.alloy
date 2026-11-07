@@ -61,8 +61,6 @@ loki.source.docker "containers" {
 }
 
 loki.process "normalize" {
-  // prometheus-discovery는 우테코 이미지에 기본 설치된 에이전트다. 재시작할 때마다
-  // 쌓인 로그를 처음부터 다시 보내 Loki가 too_far_behind로 거부하므로 수집하지 않는다.
   stage.match {
     selector = "{service_name=~\"dockerproxy|prometheus-discovery\"}"
     action   = "drop"
