@@ -13,6 +13,7 @@ import com.bibbidi.wedding.chat.adapter.ai.routing.ModelRoutingProperties;
 import com.bibbidi.wedding.chat.adapter.ai.tools.AppointmentServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.CatalogServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.ChecklistServiceAdapter;
+import com.bibbidi.wedding.chat.adapter.ai.tools.WeddingDateServiceAdapter;
 import com.bibbidi.wedding.chat.evaluation.config.EvaluationProperties.GenerationProperties;
 import com.bibbidi.wedding.chat.evaluation.config.EvaluationProperties.ModelProperties;
 import com.bibbidi.wedding.chat.evaluation.judge.BibbidiEvaluator;
@@ -93,6 +94,7 @@ public class EvaluationModelConfiguration {
             CatalogServiceAdapter catalogTools,
             ChecklistServiceAdapter checklistTools,
             AppointmentServiceAdapter appointmentTools,
+            WeddingDateServiceAdapter weddingDateTools,
             AiChatProperties chatProperties,
             EvaluationProperties properties
     ) {
@@ -101,11 +103,11 @@ public class EvaluationModelConfiguration {
                 () -> BedrockChatOptions.builder().model(chatProperties.qwenModel()).outputSchema(schema));
         ChatModelTarget medium = new ChatModelTarget(
                 chatClient(lunaModel, structuredAnswerOptions, chatMemory, systemPrompt,
-                        catalogTools, checklistTools, appointmentTools),
+                        catalogTools, checklistTools, appointmentTools, weddingDateTools),
                 properties.generation().lunaModel(), null);
         ChatModelTarget high = new ChatModelTarget(
                 chatClient(solModel, structuredAnswerOptions, chatMemory, systemPrompt,
-                        catalogTools, checklistTools, appointmentTools),
+                        catalogTools, checklistTools, appointmentTools, weddingDateTools),
                 properties.generation().solModel(), null);
         return new ChatModelRouter(Map.of(
                 ChatModelTier.LOW, low,
@@ -146,12 +148,13 @@ public class EvaluationModelConfiguration {
             SystemPrompt systemPrompt,
             CatalogServiceAdapter catalogTools,
             ChecklistServiceAdapter checklistTools,
-            AppointmentServiceAdapter appointmentTools
+            AppointmentServiceAdapter appointmentTools,
+            WeddingDateServiceAdapter weddingDateTools
     ) {
         return ChatClient.builder(model)
                 .defaultOptions(structuredAnswerOptions)
                 .defaultSystem(systemPrompt.text())
-                .defaultTools(catalogTools, checklistTools, appointmentTools)
+                .defaultTools(catalogTools, checklistTools, appointmentTools, weddingDateTools)
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
                 .build();
     }
