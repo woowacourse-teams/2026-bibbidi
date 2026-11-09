@@ -28,17 +28,17 @@ Issue: [#300](https://github.com/woowacourse-teams/2026-bibbidi/issues/300). 가
 
 `page_view`만 PostHog의 `$pageview`로 매핑한다. 기존 GA 이벤트 이름과 의미는 유지한다.
 
-| 이벤트 | 발생 지점 / 속성 |
-| --- | --- |
-| 기존 preparation, checklist, calendar, appointment_create, logout, feedback_submit | 기존 명시적 계측 재사용. login/sign_up은 제외 |
-| social_login_start | 연결된 제공자 버튼으로 인가 시작, provider=kakao/google |
-| social_login_start_failed | 인가 URL 요청 실패, provider, failure_kind=network/timeout/api/unknown |
-| social_login_callback_failed | callback 오류, provider=kakao/google/unknown, failure_kind=cancelled/invalid_callback/state_invalid_or_expired/network/timeout/api/unknown |
-| social_login_callback_complete | 콜백 API 성공, provider, terms_required. 로그인 완료와 구분 |
-| onboarding_terms_complete | 약관 동의 성공 또는 응답 유실 후 성공 확인 |
-| appointment_form_view | 일정 폼 닫힘→열림, source=checklist/calendar |
-| appointment_submit | 검증 통과 후 실제 저장 시도, source. 목록 재조회만 하는 재시도는 제외 |
-| appointment_create_failed | 입력 검증/저장 실패. 저장 후 목록 재조회 실패는 제외 |
+| 이벤트                                                                             | 발생 지점 / 속성                                                                                                                           |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 기존 preparation, checklist, calendar, appointment_create, logout, feedback_submit | 기존 명시적 계측 재사용. login/sign_up은 제외                                                                                              |
+| social_login_start                                                                 | 연결된 제공자 버튼으로 인가 시작, provider=kakao/google                                                                                    |
+| social_login_start_failed                                                          | 인가 URL 요청 실패, provider, failure_kind=network/timeout/api/unknown                                                                     |
+| social_login_callback_failed                                                       | callback 오류, provider=kakao/google/unknown, failure_kind=cancelled/invalid_callback/state_invalid_or_expired/network/timeout/api/unknown |
+| social_login_callback_complete                                                     | 콜백 API 성공, provider, terms_required. 로그인 완료와 구분                                                                                |
+| onboarding_terms_complete                                                          | 약관 동의 성공 또는 응답 유실 후 성공 확인                                                                                                 |
+| appointment_form_view                                                              | 일정 폼 닫힘→열림, source=checklist/calendar                                                                                               |
+| appointment_submit                                                                 | 검증 통과 후 실제 저장 시도, source. 목록 재조회만 하는 재시도는 제외                                                                      |
+| appointment_create_failed                                                          | 입력 검증/저장 실패. 저장 후 목록 재조회 실패는 제외                                                                                       |
 
 계정 선택·기존 계정 이전 화면을 제거하면서 `account_setup_choice`, `legacy_transfer_submit`, `legacy_transfer_failed`, `legacy_transfer_complete`, `account_setup_complete` 수집을 중단했다. 약관 동의 완료는 `onboarding_terms_complete`로 확인하고, 체크리스트 준비 후에는 `authenticated` 상태의 페이지뷰와 회원 식별을 확인한다.
 
@@ -48,7 +48,7 @@ Issue: [#300](https://github.com/woowacourse-teams/2026-bibbidi/issues/300). 가
 
 ## SDK와 리플레이
 
-공식 `posthog-js` 고정 버전을 사용한다. `autocapture`, 자동 pageview/pageleave, dead click, heatmap, 성능, 예외, 콘솔, 네트워크 본문·헤더, canvas, JSON-LD, survey와 자동 웹 실험을 끈다. 첫 화면 실험에 필요한 기능 플래그는 사용한다. IP 수집은 SDK 옵션으로는 끌 수 없다. PostHog 프로젝트 설정 **Discard client IP data**를 켠다. 원격 Replay 설정을 받는 요청 자체를 끄지는 않는다.
+공식 `posthog-js` 고정 버전을 사용한다. `autocapture`, 자동 pageview/pageleave, dead click, heatmap, 예외, 콘솔, 네트워크 본문·헤더, canvas, JSON-LD, survey와 자동 웹 실험을 끈다. 성능 수집은 아래 FCP·LCP와 준비 목록 표시 시간만 허용한다. 첫 화면 실험에 필요한 기능 플래그는 사용한다. IP 수집은 SDK 옵션으로는 끌 수 없다. PostHog 프로젝트 설정 **Discard client IP data**를 켠다. 원격 Replay 설정을 받는 요청 자체를 끄지는 않는다.
 
 ## 첫 화면 A/B 실험 (#324)
 
@@ -125,6 +125,45 @@ S3에 없는 경로(`/calendar` 등)는 CloudFront 오류 페이지로 `index.ht
 - 실제 개발 프로젝트에서 **Discard client IP data** 설정이 켜져 있고 수신 데이터에 IP가 저장되지 않는지 확인한다.
 - 실제 개발 프로젝트 QA: 같은 탭 게스트→약관→체크리스트 자동 준비·비로그인 항목 이전→최종 Person 병합, 새로고침/다른 탭/탈퇴, Safari/모바일, 차단기, StrictMode 중복, 일정 저장 후 목록 조회 실패.
 - 비밀 테스트 문자열을 입력·저장하고 Network payload와 실제 녹화에서 제목/메모/닉네임/비밀번호/code/state/referrer/DOM 속성에 남지 않는지 확인한다. 자동 테스트만으로 실제 수신·리플레이를 검증했다고 판단하지 않는다.
+
+## 첫 화면 시간 수집 (#806)
+
+CSR·SSG·SSR 변경 전후를 비교할 기준으로 브라우저 렌더링 시간과 준비 목록 표시 시간을 구분한다. 서버 응답 시간이나 API p99로 대체하지 않는다. 기존 PostHog만 사용하며 GA에는 성능 이벤트를 보내지 않는다.
+
+| 이벤트                | 속성                    | 의미                                                                                                                               |
+| --------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `$web_vitals`         | `$web_vitals_FCP_value` | 문서 탐색 시작부터 첫 콘텐츠가 그려질 때까지의 ms. 로딩 문구가 먼저 그려질 수도 있다.                                              |
+| `$web_vitals`         | `$web_vitals_LCP_value` | 문서 탐색 시작부터 브라우저가 보고한 가장 큰 콘텐츠가 그려질 때까지의 ms. 준비 목록 표시 완료를 보장하지 않는다.                   |
+| `page_content_timing` | `duration_ms`           | `/`, `/preparation`의 준비 목록 또는 최종 상태가 DOM에 반영된 뒤 두 animation frame을 기다린 시간. 실제 픽셀 표시 시각의 근사치다. |
+
+FCP·LCP는 기존 수집 허용 경로(`/`, `/preparation`, `/login`, `/calendar`, `/checklist`, `/onboarding`, `/balance-game`)에서 **문서를 시작했을 때만** 수집한다. SPA 화면마다 새 LCP를 만들지 않는다. 최초 경로를 떠난 뒤 전달된 콜백도 지표의 실제 측정 값이 경로 이탈 시각 이하면 보존하고, 이후 값은 제외한다. BFCache 복원 지표는 제외한다. 로그인 콜백·`/ai-chat`·`/landing`에서 시작한 문서는 제외하고, 별도 정적 HTML인 `/landing-story`에는 SDK가 없다.
+
+준비 목록 시간은 `navigation_kind=document`이면 `performance.now()`의 기준인 문서 탐색 시작부터 측정해 HTML·JS 다운로드, 앱 시작, 인증 확인과 API 대기를 포함한다. `navigation_kind=spa`이면 router에서 목적 경로를 처음 관찰한 때부터 측정해 lazy route 대기도 포함한다. 클릭 이전과 문서 탐색 이전의 WebView 네이티브 시작 시간은 포함하지 않는다. 같은 경로의 쿼리 변경, 재조회와 재시도는 새 측정을 만들지 않는다. StrictMode의 effect 재실행과 관계없이 앱 시작 시 수집기를 한 번 연결한다.
+
+준비 목록은 첫 결과를 방문당 한 번 기록한다. 개인화된 준비 진행률 API나 이미지가 모두 끝났다는 뜻은 아니다.
+
+| `outcome`                 | 의미                                                                                |
+| ------------------------- | ----------------------------------------------------------------------------------- |
+| `success`                 | 준비 로드맵 콘텐츠가 표시됨                                                         |
+| `empty`                   | 빈 목록 안내가 표시됨                                                               |
+| `error`                   | 오류 안내가 표시됨                                                                  |
+| `authentication_required` | 인증 만료 안내가 표시됨                                                             |
+| `abandoned`               | 완료 전에 다른 경로로 이동하거나 문서를 떠남. `/`의 캘린더 실험 리다이렉트도 포함됨 |
+| `hidden`                  | 완료 전에 탭이 백그라운드로 전환됨. 이후 복귀를 성공 시간에 합산하지 않음           |
+
+공통 속성은 `page_path`, `navigation_kind`, 문서 단위 `page_load_id`, `environment`, `app_version`, `auth_state`다. 준비 목록에는 `screen_name=preparation_catalog`, 방문 시도 단위 `measurement_id`도 있다. `auth_state`는 이벤트를 처리한 시점의 상태이며, 초기 인증 대기 중 끝난 측정은 `loading` 등으로 남을 수 있다. 로그인/게스트 식별이 끝날 때까지 최대 20건을 메모리에 보관한 후 기존 식별 정책에 따라 보낸다. 전송을 기다린 시간은 `duration_ms`에 더하지 않으며, 원래 측정 경로와 인증 상태를 유지한다. 명시적 세션 종료 시 대기는 폐기한다.
+
+`$web_vitals_*_event`에는 이름·수치·형식이 검증된 metric ID만 남긴다. DOM, entry, attribution, 리소스 URL은 보내지 않으며 페이지 URL의 쿼리·해시도 제거한다. SDK 네트워크 timing과 soft navigation 실험은 끈다. 기존 PostHog 비활성, 내부 트래픽 쿠키, DNT·수집 차단 정책은 유지한다.
+
+### p99 확인과 배포 후 검증
+
+- 준비 목록의 첫 진입은 `page_content_timing`에서 `navigation_kind=document`, `outcome=success`, `screen_name=preparation_catalog`로 필터링하고 **숫자 속성 `duration_ms`의 99백분위수**와 건수를 함께 본다. p50·p95도 같은 필터에서 각각 50·95백분위수로 집계한다. 빈 목록을 정상 표시로 포함하려면 `empty`도 포함하되 비교 기간마다 같은 기준을 쓴다. 사용자별 이벤트 수의 p99가 아니다.
+- SPA는 `navigation_kind=spa`로 따로 집계한다. 경로, `environment`, `app_version`, 브라우저·기기 유형을 맞춰 비교한다. 모바일 WebView는 SDK가 보내는 브라우저/기기 분류만으로 확실히 구분할 수 없으므로 전용 WebView 표본이라고 단정하지 않는다.
+- FCP/LCP는 각각 해당 숫자 속성이 존재하는 `$web_vitals` 이벤트에서 집계한다. 두 지표가 같은 이벤트로 묶이거나 따로 전달될 수 있으므로 이벤트 수를 페이지 방문 수로 사용하지 않는다. 필요하면 `page_load_id`로 문서를 구분한다.
+- 성공 p99와 함께 `empty/error/authentication_required/abandoned/hidden` 건수·비율을 확인한다. 최초 문서 경로에서 이탈한 후의 LCP, 지원하지 않는 브라우저 지표, 최초 백그라운드 방문의 Web Vitals, 차단기·내부 트래픽·인증 미완료 상태로 문서를 닫은 방문은 일부 또는 전부 빠질 수 있다. 누락을 0ms나 성공으로 채우지 않는다. 브라우저 수집만으로 전체 방문의 이탈률을 확정하지 않는다.
+- 사용자가 없어도 개발 환경에서 직접 방문해 전송과 집계가 되는지 검증할 수 있다. 소수의 수동 방문은 운영 p99를 대표하지 않는다. 표본이 적으면 분포와 건수를 먼저 보고 실제 운영 트래픽이 쌓인 뒤 판단한다.
+- 배포 후 PostHog Live events/Network에서 직접 새로고침, 내부 이동, 느린 인증·API, 빈 목록·실패·이탈을 확인한다. `page_load_id + measurement_id`당 준비 목록 이벤트가 하나인지, 시간 단위가 ms인지, 허용되지 않은 URL·DOM·원문 속성이 없는지 확인한다. FCP/LCP는 브라우저가 보고하고 SDK가 배치하는 시점에 도착하므로 목록 표시 이벤트와 같은 순간에 보이지 않을 수 있다.
+- 자동 테스트는 경로·인증 대기·중복·이탈·백그라운드·개인정보 필터를 검증한다. 실제 PostHog 수신, 운영 p99와 모바일 WebView의 브라우저 API 지원 여부는 배포 후 실기기 검증 대상으로 남는다.
 
 ## 구현 책임과 변경 범위
 

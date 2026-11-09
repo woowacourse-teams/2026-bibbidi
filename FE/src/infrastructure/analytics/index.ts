@@ -2,6 +2,7 @@ import { createAnalyticsClient } from "./analytics";
 import { createGoogleAnalyticsProvider } from "./googleAnalyticsProvider";
 import { createPostHogProvider } from "./posthogProvider";
 import type { HomeEntryVariant } from "./homeEntryExperiment";
+import { startPageContentTiming, type TimingRouter } from "./pageContentTiming";
 
 const googleAnalyticsMeasurementId =
   typeof __BIBBIDI_GA_MEASUREMENT_ID__ === "string"
@@ -28,6 +29,14 @@ if (
 }
 
 export const analytics = createAnalyticsClient(providers);
+
+export function startPagePerformanceTracking(router: TimingRouter) {
+  return posthogProvider
+    ? startPageContentTiming(router, (event) =>
+        posthogProvider?.trackPerformance(event),
+      )
+    : () => {};
+}
 
 export function resolveHomeEntryVariant(): Promise<HomeEntryVariant> {
   return (

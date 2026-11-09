@@ -168,7 +168,7 @@ export function PreparationRoadmap({
     if (!pending) setOpenStage(null);
   };
   return (
-    <div className="preparation-roadmap">
+    <div className="preparation-roadmap" data-page-content-state="success">
       <RoadmapHeader
         categoryTitle={viewModel.categoryTitle}
         summary={viewModel.summary}

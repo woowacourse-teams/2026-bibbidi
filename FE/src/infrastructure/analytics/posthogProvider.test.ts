@@ -47,8 +47,171 @@ function setup(initialId = "anonymous-1", enabled = true) {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   window.history.replaceState(null, "", "/");
   document.cookie = "bibbidi_internal=; Max-Age=0";
+});
+
+describe("PostHog 첫 화면 성능", () => {
+  const timing = {
+    name: "page_content_timing",
+    parameters: {
+      page_path: "/preparation",
+      screen_name: "preparation_catalog",
+      measurement_id: "content-1",
+      navigation_kind: "document",
+      duration_ms: 1234,
+      outcome: "success",
+    },
+  };
+  function beforeSend(sdk: ReturnType<typeof setup>["sdk"]) {
+    const callback = (sdk.init.mock.calls[0][1] as PostHogConfig).before_send;
+    if (typeof callback !== "function") throw new Error("before_send missing");
+    return callback;
+  }
+  it("FCP/LCP만 켜고 네트워크·DOM attribution·SPA Web Vitals는 끈다", () => {
+    const { sdk } = setup();
+    expect(
+      (sdk.init.mock.calls[0][1] as PostHogConfig).capture_performance,
+    ).toEqual({
+      web_vitals: true,
+      web_vitals_allowed_metrics: ["FCP", "LCP"],
+      web_vitals_attribution: false,
+      network_timing: false,
+      __preview_web_vitals_soft_navs: false,
+    });
+  });
+  it("인증 전 성능을 보관했다가 식별 후 원래 경로와 측정 시점 인증 상태로 보낸다", () => {
+    window.history.replaceState(null, "", "/preparation?categoryId=secret");
+    const { sdk, provider, client } = setup("bibbidi:user:42");
+    provider.trackPerformance(timing);
+    expect(sdk.capture).not.toHaveBeenCalled();
+    client.setContext({ authState: "guest", pathname: "/calendar" });
+    expect(sdk.reset).toHaveBeenCalledOnce();
+    expect(sdk.capture).toHaveBeenCalledExactlyOnceWith(
+      "page_content_timing",
+      expect.objectContaining({
+        ...timing.parameters,
+        auth_state: "loading",
+        $current_url: "http://localhost:3000/preparation",
+        $pathname: "/preparation",
+        environment: "test",
+        app_version: "test-sha",
+        page_load_id: expect.any(String),
+      }),
+    );
+    client.setContext({ authState: "guest", pathname: "/calendar" });
+    expect(sdk.capture).toHaveBeenCalledOnce();
+  });
+  it("SDK Web Vitals도 인증 전에는 보내지 않고 정제한 값만 대기시킨다", () => {
+    window.history.replaceState(null, "", "/preparation?code=secret");
+    const { sdk, client } = setup();
+    const filter = beforeSend(sdk);
+    expect(
+      filter({
+        uuid: "test",
+        event: "$web_vitals",
+        properties: {
+          $web_vitals_FCP_value: 100,
+          $web_vitals_FCP_event: { id: "v5-123", entries: ["secret"] },
+          $current_url: "http://localhost:3000/auth/kakao?code=secret",
+        },
+      }),
+    ).toBeNull();
+    expect(sdk.capture).not.toHaveBeenCalled();
+    client.setContext({ authState: "guest", pathname: "/preparation" });
+    const [name, properties] = sdk.capture.mock.calls[0];
+    expect(name).toBe("$web_vitals");
+    expect(JSON.stringify(properties)).not.toContain("secret");
+    const sent = filter({ uuid: "queued", event: name, properties });
+    expect(sent?.properties).toMatchObject({
+      $web_vitals_FCP_value: 100,
+      $web_vitals_FCP_event: { name: "FCP", value: 100, id: "v5-123" },
+      page_path: "/preparation",
+      auth_state: "loading",
+    });
+  });
+  it("경로 이탈 뒤 늦게 전달돼도 이탈 전에 측정된 값만 최초 문서 경로에 남긴다", () => {
+    window.history.replaceState(null, "", "/preparation");
+    const { sdk, client } = setup();
+    const clock = vi.spyOn(performance, "now").mockReturnValue(500);
+    client.setContext({ authState: "guest", pathname: "/calendar" });
+    clock.mockReturnValue(2000);
+    const filter = beforeSend(sdk);
+    const result = filter({
+      uuid: "test",
+      event: "$web_vitals",
+      properties: {
+        $web_vitals_FCP_value: 100,
+        $web_vitals_LCP_value: 700,
+        $pathname: "/calendar",
+        $current_url: "http://localhost:3000/calendar",
+      },
+    });
+    expect(result?.properties).toMatchObject({
+      $web_vitals_FCP_value: 100,
+      page_path: "/preparation",
+      $pathname: "/preparation",
+      $current_url: "http://localhost:3000/preparation",
+    });
+    expect(result?.properties).not.toHaveProperty("$web_vitals_LCP_value");
+    expect(
+      filter({
+        uuid: "late",
+        event: "$web_vitals",
+        properties: {
+          $web_vitals_LCP_value: 700,
+        },
+      }),
+    ).toBeNull();
+  });
+  it("콜백에서 시작한 문서의 Web Vitals는 공개 화면으로 이동해도 수집하지 않는다", () => {
+    window.history.replaceState(null, "", "/auth/kakao?code=secret");
+    const { sdk, client } = setup();
+    client.setContext({ authState: "guest", pathname: "/preparation" });
+    expect(
+      beforeSend(sdk)({
+        uuid: "test",
+        event: "$web_vitals",
+        properties: {
+          $web_vitals_LCP_value: 100,
+        },
+      }),
+    ).toBeNull();
+  });
+  it("성능 대기를 20건으로 제한하고 명시적 세션 종료 때 폐기한다", () => {
+    const { sdk, client, provider } = setup();
+    for (let index = 0; index < 25; index++) provider.trackPerformance(timing);
+    client.setContext({ authState: "guest", pathname: "/" });
+    expect(sdk.capture).toHaveBeenCalledTimes(20);
+    sdk.capture.mockClear();
+    client.setContext({ authState: "loading", pathname: "/" });
+    provider.trackPerformance(timing);
+    client.reset();
+    client.setContext({ authState: "guest", pathname: "/" });
+    expect(sdk.capture).not.toHaveBeenCalled();
+  });
+  it("대기 이벤트 하나가 실패해도 나머지 전송과 리플레이 설정을 계속한다", () => {
+    const { sdk, provider } = setup();
+    provider.trackPerformance(timing);
+    provider.trackPerformance(timing);
+    sdk.capture.mockImplementationOnce(() => {
+      throw new Error("SDK failure");
+    });
+    expect(() =>
+      provider.setContext?.({ authState: "guest", pathname: "/" }),
+    ).not.toThrow();
+    expect(sdk.capture).toHaveBeenCalledTimes(2);
+    expect(sdk.startSessionRecording).toHaveBeenCalledOnce();
+  });
+  it.each(["disabled", "internal"])("%s이면 성능도 보내지 않는다", (mode) => {
+    if (mode === "internal") document.cookie = "bibbidi_internal=1";
+    const { sdk, client, provider } = setup("anonymous", mode !== "disabled");
+    client.setContext({ authState: "guest", pathname: "/" });
+    provider.trackPerformance(timing);
+    expect(sdk.init).not.toHaveBeenCalled();
+    expect(sdk.capture).not.toHaveBeenCalled();
+  });
 });
 
 describe("PostHog 사용자 여정", () => {
