@@ -11,6 +11,7 @@ import com.bibbidi.wedding.chat.adapter.ai.prompt.SystemPrompt;
 import com.bibbidi.wedding.chat.adapter.ai.tools.AppointmentServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.CatalogServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.ChecklistServiceAdapter;
+import com.bibbidi.wedding.chat.adapter.ai.tools.WeddingDateServiceAdapter;
 import io.micrometer.observation.ObservationRegistry;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +19,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import com.bibbidi.wedding.chat.adapter.ai.routing.JevClient;
+import com.bibbidi.wedding.chat.adapter.ai.tools.BibbidiToolCallingManager;
+import org.springframework.ai.bedrock.converse.BedrockChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
@@ -42,16 +47,16 @@ class AiChatConfigTest {
 
     private final ToolCallingManager toolCallingManager = spy(ToolCallingManager.builder().build());
 
-    private final ApplicationContextRunner runner = new ApplicationContextRunner()
+    private final ApplicationContextRunner runnerWithoutToolCallingManager = new ApplicationContextRunner()
             .withUserConfiguration(AiChatConfig.class)
             .withConfiguration(AutoConfigurations.of(BedrockAwsConnectionConfiguration.class))
             .withBean(ChatClient.Builder.class, () -> ChatClient.builder(mock(ChatModel.class)))
             .withBean(ObservationRegistry.class, ObservationRegistry::create)
-            .withBean(ToolCallingManager.class, () -> toolCallingManager)
             .withBean(SystemPrompt.class, SystemPrompt::new)
             .withBean(CatalogServiceAdapter.class, () -> new CatalogServiceAdapter(mock(CatalogService.class)))
             .withBean(ChecklistServiceAdapter.class, () -> mock(ChecklistServiceAdapter.class))
             .withBean(AppointmentServiceAdapter.class, () -> mock(AppointmentServiceAdapter.class))
+            .withBean(WeddingDateServiceAdapter.class, () -> mock(WeddingDateServiceAdapter.class))
             .withPropertyValues(
                     "spring.profiles.active=prod",
                     "bibbidi.ai.chatbot.memory-max-messages=10",
@@ -63,6 +68,9 @@ class AiChatConfigTest {
                     "spring.ai.bedrock.converse.chat.model=sol-test",
                     "spring.ai.bedrock.converse.chat.max-tokens=2048",
                     "spring.ai.bedrock.aws.region=ap-northeast-1");
+
+    private final ApplicationContextRunner runner = runnerWithoutToolCallingManager
+            .withBean(ToolCallingManager.class, () -> toolCallingManager);
 
     private final ApplicationContextRunner accountsEnabledRunner = runner.withPropertyValues(
             "bibbidi.ai.chatbot.accounts-enabled=true",
@@ -123,6 +131,39 @@ class AiChatConfigTest {
             assertThat(context).hasBean("qwenChatClient");
             assertThat(context).hasBean("lunaChatClient");
             assertThat(context).hasBean("solBedrockCredentialsProvider");
+            assertThat(context.getBean("qwenChatClient")).isInstanceOf(ChatClient.class);
+            assertThat(context.getBean("lunaChatClient")).isInstanceOf(ChatClient.class);
+            assertThat(context.getBean("balanceGameQwenChatClient")).isInstanceOf(ChatClient.class);
+        });
+    }
+
+    @Test
+    void usesTheJevToolCallingManagerOnlyWhenTheToolLoopIsEnabled() {
+        ApplicationContextRunner jevRunner = runnerWithoutToolCallingManager
+                .withBean(JevClient.class, () -> mock(JevClient.class))
+                .withPropertyValues(
+                        "bibbidi.ai.chatbot.accounts-enabled=true",
+                        "bibbidi.ai.chatbot.qwen-access-key=test-qwen-access-key",
+                        "bibbidi.ai.chatbot.qwen-secret-key=test-qwen-secret-key",
+                        "bibbidi.ai.chatbot.qwen-region=ap-northeast-1");
+
+        jevRunner.withPropertyValues("bibbidi.ai.chatbot.jev-tool-loop.enabled=true").run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(ToolCallingManager.class)).isInstanceOf(BibbidiToolCallingManager.class);
+        });
+    }
+
+    @Test
+    void requestsStrictJsonOnlyForOpenAiModelsOnBedrock() {
+        runner.withPropertyValues("spring.ai.bedrock.converse.chat.model=openai.gpt-oss-120b").run(context -> {
+            BedrockChatOptions options = (BedrockChatOptions) context.getBean(ChatOptions.Builder.class).build();
+            assertThat(options.getOutputSchema()).isNotBlank();
+            assertThat(options.getRequestParameters()).containsOnlyKeys("text");
+        });
+        runner.run(context -> {
+            BedrockChatOptions options = (BedrockChatOptions) context.getBean(ChatOptions.Builder.class).build();
+            assertThat(options.getOutputSchema()).isNotBlank();
+            assertThat(options.getRequestParameters()).isNullOrEmpty();
         });
     }
 
