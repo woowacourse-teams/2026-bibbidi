@@ -191,6 +191,19 @@ describe("PostHog 첫 화면 성능", () => {
     client.setContext({ authState: "guest", pathname: "/" });
     expect(sdk.capture).not.toHaveBeenCalled();
   });
+  it("대기 이벤트 하나가 실패해도 나머지 전송과 리플레이 설정을 계속한다", () => {
+    const { sdk, provider } = setup();
+    provider.trackPerformance(timing);
+    provider.trackPerformance(timing);
+    sdk.capture.mockImplementationOnce(() => {
+      throw new Error("SDK failure");
+    });
+    expect(() =>
+      provider.setContext?.({ authState: "guest", pathname: "/" }),
+    ).not.toThrow();
+    expect(sdk.capture).toHaveBeenCalledTimes(2);
+    expect(sdk.startSessionRecording).toHaveBeenCalledOnce();
+  });
   it.each(["disabled", "internal"])("%s이면 성능도 보내지 않는다", (mode) => {
     if (mode === "internal") document.cookie = "bibbidi_internal=1";
     const { sdk, client, provider } = setup("anonymous", mode !== "disabled");

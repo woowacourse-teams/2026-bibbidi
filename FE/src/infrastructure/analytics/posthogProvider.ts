@@ -225,7 +225,11 @@ export function createPostHogProvider(
       }
       identityReady = true;
       for (const event of pendingPerformance.splice(0)) {
-        sdk.capture(event.name, event.properties);
+        try {
+          sdk.capture(event.name, event.properties);
+        } catch {
+          // 한 건의 SDK 오류가 나머지 전송과 리플레이 설정을 중단하지 않는다.
+        }
       }
       if (!analyticsPagePath(context.pathname)) stopRecording();
       else if (!recording) {
