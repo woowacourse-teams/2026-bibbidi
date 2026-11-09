@@ -1,6 +1,10 @@
 import posthog, { type PostHog } from "posthog-js";
 
-import type { AnalyticsContext, AnalyticsProvider } from "./analytics";
+import type {
+  AnalyticsContext,
+  AnalyticsEvent,
+  AnalyticsProvider,
+} from "./analytics";
 import {
   HOME_ENTRY_EXPERIMENT_KEY,
   type HomeEntryVariant,
@@ -9,6 +13,7 @@ import {
   analyticsPagePath,
   PRIVATE_REPLAY_CONFIG,
   sanitizePostHogEvent,
+  webVitalsProperties,
 } from "./posthogPrivacy";
 
 interface PostHogOptions {
@@ -47,11 +52,23 @@ export function createPostHogProvider(
   sdk: PostHogSdk = posthog,
 ): AnalyticsProvider & {
   resolveHomeEntryVariant: () => Promise<HomeEntryVariant>;
+  trackPerformance: (event: AnalyticsEvent) => void;
 } {
   let initialized = false;
   let recording = false;
   let identityReady = false;
   let context: AnalyticsContext = { authState: "loading", pathname: "/" };
+  let initialPath: string | null = null;
+  let initialUrl = "";
+  let routeLeftAt = Infinity;
+  const pageLoadId =
+    typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const pendingPerformance: {
+    name: string;
+    properties: Record<string, unknown>;
+  }[] = [];
 
   const stopRecording = () => {
     if (recording) sdk.stopSessionRecording();
@@ -70,6 +87,19 @@ export function createPostHogProvider(
     ["guest", "onboardingRequired", "authenticated"].includes(
       context.authState,
     );
+  const capturePerformance = (
+    name: string,
+    properties: Record<string, unknown>,
+  ) => {
+    if (!initialized) return;
+    if (!identityReady || !isSettled()) {
+      // 인증 확인이 길어져도 대기 이벤트를 무제한 보관하지 않는다.
+      if (pendingPerformance.length < 20)
+        pendingPerformance.push({ name, properties });
+      return;
+    }
+    sdk.capture(name, properties);
+  };
 
   return {
     initialize() {
@@ -80,6 +110,8 @@ export function createPostHogProvider(
         isInternalTraffic()
       )
         return;
+      initialPath = analyticsPagePath(window.location.pathname);
+      initialUrl = initialPath ? `${window.location.origin}${initialPath}` : "";
       sdk.init(options.token, {
         api_host: options.host,
         ui_host: options.host.includes("eu.")
@@ -94,7 +126,13 @@ export function createPostHogProvider(
         capture_pageleave: false,
         capture_dead_clicks: false,
         capture_heatmaps: false,
-        capture_performance: false,
+        capture_performance: {
+          web_vitals: true,
+          web_vitals_allowed_metrics: ["FCP", "LCP"],
+          web_vitals_attribution: false,
+          network_timing: false,
+          __preview_web_vitals_soft_navs: false,
+        },
         capture_exceptions: false,
         enable_recording_console_log: false,
         disable_session_recording: true,
@@ -109,6 +147,35 @@ export function createPostHogProvider(
         respect_dnt: true,
         session_recording: PRIVATE_REPLAY_CONFIG,
         before_send: (event) => {
+          if (event?.event === "$web_vitals") {
+            if (!initialPath) return null;
+            const metrics = webVitalsProperties(event.properties, routeLeftAt);
+            if (!Object.keys(metrics).length) return null;
+            const properties = {
+              ...metrics,
+              page_path: initialPath,
+              $current_url: initialUrl,
+              $pathname: initialPath,
+              page_load_id: pageLoadId,
+              navigation_kind: "document",
+              auth_state: event.properties.auth_state ?? context.authState,
+              environment: options.environment,
+              app_version: options.appVersion,
+            };
+            if (!identityReady || !isSettled()) {
+              capturePerformance("$web_vitals", properties);
+              return null;
+            }
+            const otherProperties = Object.fromEntries(
+              Object.entries(event.properties).filter(
+                ([key]) => !key.startsWith("$web_vitals_"),
+              ),
+            );
+            return sanitizePostHogEvent({
+              ...event,
+              properties: { ...otherProperties, ...properties },
+            });
+          }
           if (
             event?.event === "$snapshot" &&
             (!identityReady ||
@@ -127,6 +194,12 @@ export function createPostHogProvider(
       initialized = true;
     },
     setContext(nextContext) {
+      if (
+        initialPath &&
+        analyticsPagePath(nextContext.pathname) !== initialPath
+      ) {
+        routeLeftAt = Math.min(routeLeftAt, performance.now());
+      }
       identityReady = false;
       context = nextContext;
       if (!initialized) return;
@@ -151,6 +224,9 @@ export function createPostHogProvider(
         ensureAnonymous();
       }
       identityReady = true;
+      for (const event of pendingPerformance.splice(0)) {
+        sdk.capture(event.name, event.properties);
+      }
       if (!analyticsPagePath(context.pathname)) stopRecording();
       else if (!recording) {
         sdk.startSessionRecording();
@@ -191,12 +267,27 @@ export function createPostHogProvider(
       }
     },
     reset() {
+      pendingPerformance.length = 0;
       identityReady = false;
       if (initialized) {
         stopRecording();
         ensureAnonymous();
       }
       context = { authState: "loading", pathname: context.pathname };
+    },
+    trackPerformance(event) {
+      if (event.name !== "page_content_timing") return;
+      const path = event.parameters.page_path;
+      if (typeof path !== "string" || !analyticsPagePath(path)) return;
+      capturePerformance(event.name, {
+        ...event.parameters,
+        $current_url: `${window.location.origin}${path}`,
+        $pathname: path,
+        page_load_id: pageLoadId,
+        auth_state: context.authState,
+        environment: options.environment,
+        app_version: options.appVersion,
+      });
     },
     resolveHomeEntryVariant() {
       if (!initialized || !identityReady || !isSettled()) {

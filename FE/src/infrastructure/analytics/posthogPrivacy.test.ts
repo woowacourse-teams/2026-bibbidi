@@ -5,9 +5,53 @@ import {
   PRIVATE_REPLAY_CONFIG,
   sanitizeAnalyticsUrl,
   sanitizePostHogEvent,
+  webVitalsProperties,
 } from "./posthogPrivacy";
 
 describe("PostHog 개인정보 정제", () => {
+  it("FCP/LCP의 수치와 고정 구조만 남기고 DOM·리소스 URL·다른 지표를 제거한다", () => {
+    const result = sanitizePostHogEvent({
+      uuid: "vitals",
+      event: "$web_vitals",
+      properties: {
+        $web_vitals_FCP_value: 100,
+        $web_vitals_LCP_value: 900,
+        $web_vitals_LCP_event: {
+          id: "v5-123-456",
+          name: "LCP",
+          value: 900,
+          entries: [{ element: "secret", url: "https://secret" }],
+          attribution: { element: "secret" },
+        },
+        $web_vitals_CLS_value: 0.1,
+        $web_vitals_LCP_attribution: "secret",
+      },
+    });
+    expect(result?.properties).toEqual({
+      $web_vitals_FCP_value: 100,
+      $web_vitals_FCP_event: { name: "FCP", value: 100 },
+      $web_vitals_LCP_value: 900,
+      $web_vitals_LCP_event: { name: "LCP", value: 900, id: "v5-123-456" },
+    });
+    expect(JSON.stringify(result)).not.toContain("secret");
+  });
+  it.each([NaN, Infinity, -1, "100", null])(
+    "유효하지 않은 성능 값 %s를 버린다",
+    (value) => {
+      expect(webVitalsProperties({ $web_vitals_LCP_value: value })).toEqual({});
+    },
+  );
+  it("측정 시각이 경로 이탈보다 늦거나 BFCache 복원이면 제외한다", () => {
+    expect(webVitalsProperties({ $web_vitals_LCP_value: 300 }, 200)).toEqual(
+      {},
+    );
+    expect(
+      webVitalsProperties({
+        $web_vitals_LCP_value: 100,
+        $web_vitals_LCP_event: { navigationType: "back-forward-cache" },
+      }),
+    ).toEqual({});
+  });
   it("첫 화면 실험의 노출군만 허용하고 다른 플래그와 임의 속성은 제거한다", () => {
     const result = sanitizePostHogEvent({
       uuid: "test",

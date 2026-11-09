@@ -115,7 +115,42 @@ const ALLOWED_PROPERTIES = new Set([
   "entry_source",
   "to_status",
   "from_status",
+  "page_load_id",
+  "measurement_id",
+  "navigation_kind",
+  "duration_ms",
 ]);
+
+// SDK 원본의 entries·attribution에는 DOM과 리소스 URL이 포함될 수 있다.
+export function webVitalsProperties(
+  properties: Record<string, unknown>,
+  cutoff = Infinity,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const name of ["FCP", "LCP"]) {
+    const value = properties[`$web_vitals_${name}_value`];
+    const raw = properties[`$web_vitals_${name}_event`];
+    const metric =
+      raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    if (
+      metric.navigationType === "back-forward-cache" ||
+      typeof value !== "number" ||
+      !Number.isFinite(value) ||
+      value < 0 ||
+      value > cutoff
+    )
+      continue;
+    result[`$web_vitals_${name}_value`] = value;
+    result[`$web_vitals_${name}_event`] = {
+      name,
+      value,
+      ...(typeof metric.id === "string" && /^v[\w-]{1,100}$/.test(metric.id)
+        ? { id: metric.id }
+        : {}),
+    };
+  }
+  return result;
+}
 
 // 홍보 유입 분석용 값이다. 전체 URL과 referrer 원문 대신 캠페인 값과 유입 도메인만 남긴다.
 const CAMPAIGN_KEYS = [
@@ -161,6 +196,9 @@ export function sanitizePostHogEvent(
     ) {
       properties[key] = sanitizeAnalyticsUrl(value);
     }
+  }
+  if (event.event === "$web_vitals") {
+    Object.assign(properties, webVitalsProperties(event.properties));
   }
   const experimentVariant =
     event.properties[`$feature/${HOME_ENTRY_EXPERIMENT_KEY}`];

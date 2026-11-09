@@ -6,7 +6,10 @@ import { AppPageViewTracker } from "./app/analytics/AppPageViewTracker";
 import { router } from "./app/router";
 import { AuthProvider } from "./features/auth";
 import { ChecklistMigrationProvider } from "./features/checklist-migration";
-import { analytics } from "./infrastructure/analytics";
+import {
+  analytics,
+  startPagePerformanceTracking,
+} from "./infrastructure/analytics";
 import { preventLinkDrag } from "./infrastructure/browser/preventLinkDrag";
 import {
   initializeErrorTracking,
@@ -28,6 +31,7 @@ if (!rootElement) {
 }
 
 analytics.initialize();
+startPagePerformanceTracking(router);
 
 createRoot(rootElement, {
   onCaughtError: (error) =>
