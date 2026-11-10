@@ -4,10 +4,7 @@ logging {
 }
 
 prometheus.scrape "bibbidi_backend" {
-  targets = [{
-    __address__                 = "backend:8081",
-    deployment_environment_name = sys.env("DEPLOYMENT_ENVIRONMENT_NAME"),
-  }]
+  targets = discovery.relabel.backend_metrics.output
 
   scrape_interval = "15s"
   metrics_path    = "/actuator/prometheus"
@@ -30,7 +27,42 @@ prometheus.remote_write "monitoring" {
 }
 
 discovery.docker "containers" {
-  host = coalesce(sys.env("DOCKER_HOST_URL"), "unix:///var/run/docker.sock")
+  host             = coalesce(sys.env("DOCKER_HOST_URL"), "unix:///var/run/docker.sock")
+  refresh_interval = "15s"
+}
+
+discovery.relabel "backend_metrics" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/?bibbidi-backend(-(blue|green))?"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_network_name"]
+    regex         = "bibbidi-observability"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_port_private"]
+    regex         = "8081"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/?bibbidi-(backend(-(blue|green))?)"
+    target_label  = "instance"
+    replacement   = "$1:8081"
+  }
+
+  rule {
+    target_label = "deployment_environment_name"
+    replacement  = sys.env("DEPLOYMENT_ENVIRONMENT_NAME")
+  }
 }
 
 discovery.relabel "docker_logs" {
@@ -50,6 +82,20 @@ discovery.relabel "docker_logs" {
   rule {
     target_label = "service_instance_id"
     replacement  = sys.env("SERVICE_INSTANCE_ID")
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/?bibbidi-backend(-(blue|green))?"
+    target_label  = "service_name"
+    replacement   = "bibbidi-backend"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/?bibbidi-backend-(blue|green)"
+    target_label  = "service_instance_id"
+    replacement   = string.format("%s-$1", sys.env("SERVICE_INSTANCE_ID"))
   }
 }
 

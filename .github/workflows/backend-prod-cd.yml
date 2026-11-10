@@ -51,6 +51,7 @@ jobs:
     uses: ./.github/workflows/backend-common-cd.yml
     secrets: inherit
     with:
+      blue-green: true
       deployment-environment: backend-prod
       runner-labels: '["self-hosted", "linux", "ARM64", "prod"]'
       image-tag: ${{ needs.resolve-image.outputs.image-tag }}
