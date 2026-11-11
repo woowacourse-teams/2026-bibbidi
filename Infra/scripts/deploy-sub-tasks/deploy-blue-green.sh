@@ -1,25 +1,50 @@
 #!/usr/bin/env bash
 
-# Deploy one inactive slot from an already downloaded image. No EC2/DNS changes.
+# Blue/Green operations on one host. No EC2/DNS changes.
+#   deploy-blue-green.sh {blue|green} IMAGE_TAG
+#       Start the inactive slot from an already downloaded image and switch to it.
+#       The previous app keeps running without traffic so it can be switched back to.
+#   deploy-blue-green.sh rollback
+#       Switch back to the other slot, which must still be running.
+#   deploy-blue-green.sh cleanup
+#       Stop and remove the app that receives no traffic.
 # Required deadlines (seconds): HEALTHCHECK_TIMEOUT_SECONDS,
 # PROXY_VERIFY_TIMEOUT_SECONDS, DRAIN_TIMEOUT_SECONDS. No production defaults.
-# Exit: 0 switched and old app stopped; 10 failed before switch, new app stopped/absent;
-# 20 restored and new app stopped; 30 recovery/cleanup unverified;
-# 40 cutover was verified, old-app cleanup unverified; 64 preflight failed.
+# Optional: CLEANUP_LOG_TAIL_LINES (default 0 = off) prints the last log lines of a
+# container just before it is removed. Logs may contain user data, so keep it off
+# unless the output goes somewhere access-controlled.
+# Exit: 0 done (deploy/rollback: switched and the other app kept running);
+# 10 failed before switch and nothing is left to undo (deploy: new app stopped/absent);
+# 20 restored the previous route (deploy: new app stopped); 30 recovery/cleanup unverified;
+# 40 cutover was verified, a later check failed (no automatic rollback or stop);
+# 64 preflight failed.
 set -euo pipefail
 log() { printf '[blue-green] %s\n' "$*"; }
 fail() { printf '[blue-green] ERROR: %s\n' "$*" >&2; exit 1; }
 preflight_fail() { printf '[blue-green] ERROR: %s\n' "$*" >&2; exit 64; }
 
-[[ "$#" -eq 2 ]] || preflight_fail 'Usage: deploy-blue-green.sh {blue|green} IMAGE_TAG'
-slot="$1"
-tag="$2"
-case "$slot" in
-  blue) app_port=8080; health_port=8081 ;;
-  green) app_port=8082; health_port=8083 ;;
-  *) preflight_fail 'Expected blue or green' ;;
+usage='Usage: deploy-blue-green.sh {blue|green} IMAGE_TAG | rollback | cleanup'
+[[ "$#" -ge 1 ]] || preflight_fail "$usage"
+mode="$1"
+slot=''
+tag=''
+case "$mode" in
+  blue|green)
+    [[ "$#" -eq 2 ]] || preflight_fail "$usage"
+    slot="$mode"
+    tag="$2"
+    mode=deploy
+    [[ "$tag" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || preflight_fail 'Invalid image tag' ;;
+  rollback|cleanup) [[ "$#" -eq 1 ]] || preflight_fail "$usage" ;;
+  *) preflight_fail "$usage" ;;
 esac
-[[ "$tag" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || preflight_fail 'Invalid image tag'
+slot_ports() {
+  case "$1" in
+    blue) app_port=8080; health_port=8081 ;;
+    green) app_port=8082; health_port=8083 ;;
+  esac
+}
+[[ -z "$slot" ]] || slot_ports "$slot"
 for command in docker curl python3 flock; do
   command -v "$command" >/dev/null || preflight_fail "Missing command: $command"
 done
@@ -29,13 +54,18 @@ drain_timeout="${DRAIN_TIMEOUT_SECONDS:-}"
 for timeout in "$health_timeout" "$proxy_timeout" "$drain_timeout"; do
   [[ "$timeout" =~ ^[1-9][0-9]{0,3}$ ]] || preflight_fail 'Set all three deadlines to positive integer seconds (up to 9999)'
 done
+log_tail_lines="${CLEANUP_LOG_TAIL_LINES:-0}"
+[[ "$log_tail_lines" =~ ^[0-9]{1,3}$ ]] || preflight_fail 'CLEANUP_LOG_TAIL_LINES must be 0-999'
 app_dir="${EC2_DEPLOY_PATH:-/opt/bibbidi/app}"
 base="${BIBBIDI_BASE_COMPOSE_FILE:-$app_dir/compose.yaml}"
 overlay="$app_dir/compose.blue-green.yml"
 upstream_dir="${NGINX_UPSTREAM_DIR:-$app_dir/infra/nginx/upstream}"
-for file in "$base" "$overlay" "$app_dir/.env" "$app_dir/infra/monitoring/.env.alloy"; do
-  [[ -f "$file" ]] || preflight_fail 'Required Compose or environment file is missing'
-done
+# Rollback and cleanup only switch or remove containers, so they must not depend on Compose files.
+if [[ "$mode" = deploy ]]; then
+  for file in "$base" "$overlay" "$app_dir/.env" "$app_dir/infra/monitoring/.env.alloy"; do
+    [[ -f "$file" ]] || preflight_fail 'Required Compose or environment file is missing'
+  done
+fi
 upstream_dir="$(cd "$upstream_dir" && pwd -P)" || preflight_fail 'Upstream directory is unavailable'
 active="$upstream_dir/active.conf"
 [[ -f "$active" && ! -L "$active" ]] || preflight_fail 'active.conf must be an existing regular file'
@@ -54,6 +84,15 @@ case "$(printf '%s' "$original_config" | sed 's/#.*//' | tr -d '[:space:]')" in
   'serverbackend-green:8080;') previous=backend-green ;;
   *) preflight_fail 'active.conf must select exactly one known backend' ;;
 esac
+# Rollback and cleanup act on the slot that does not receive traffic.
+if [[ "$mode" != deploy ]]; then
+  case "$previous" in
+    backend-blue) slot=green ;;
+    backend-green) slot=blue ;;
+    *) preflight_fail "$mode requires a selected Blue/Green backend" ;;
+  esac
+  slot_ports "$slot"
+fi
 target="backend-$slot"
 target_name="bibbidi-$target"
 [[ "$previous" != "$target" ]] || preflight_fail 'Cannot deploy over the selected slot'
@@ -70,9 +109,13 @@ target_id() {
   docker container ls -a --no-trunc --filter "name=^/$target_name$" --format '{{.ID}}'
 }
 before_id="$(target_id)" || preflight_fail 'Cannot inspect target container'
+# A leftover container of the same Compose project and service is ours to switch back to or remove.
 if [[ -n "$before_id" ]]; then
-  [[ "$(docker inspect --format '{{.State.Running}}' "$before_id")" = false ]] || preflight_fail 'Target is already running; it is not owned by this deployment'
   [[ "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}} {{index .Config.Labels "com.docker.compose.service"}}' "$before_id")" = "$project $target" ]] || preflight_fail 'Existing target belongs to another deployment'
+fi
+if [[ "$mode" = rollback ]]; then
+  [[ -n "$before_id" ]] || preflight_fail 'Rollback target does not exist; redeploy the previous version instead'
+  [[ "$(docker inspect --format '{{.State.Running}}' "$before_id")" = true ]] || preflight_fail 'Rollback target is not running; redeploy the previous version instead'
 fi
 
 # Record process start times too, so a reused PID does not count as an old worker.
@@ -169,6 +212,8 @@ remember_target() {
   owned_id="$found"
 }
 stop_owned() {
+  # Rollback targets the previous, healthy app, so a failed rollback never stops it.
+  [[ "$mode" = deploy ]] || return 0
   remember_target || return 1
   [[ -n "$owned_id" ]] || return 0
   log "Stopping this deployment's failed $target container"
@@ -176,14 +221,35 @@ stop_owned() {
   docker stop "$owned_id" >/dev/null || return 1
   [[ "$(docker inspect --format '{{.State.Running}} {{.State.Restarting}}' "$owned_id")" = 'false false' ]]
 }
+# Removing a container that nginx may still reach would drop its requests.
+require_no_draining() {
+  local current
+  current="$(workers)" || return 1
+  ! printf '%s\n' "$current" | grep -q ':draining$'
+}
+# Only for a container that receives no traffic; preserve Compose's stop_grace_period.
+remove_idle_target() {
+  local id="$1"
+  if (( log_tail_lines > 0 )); then
+    log "Last $log_tail_lines log lines of $target_name before removal"
+    docker logs --tail "$log_tail_lines" "$id" 2>&1 | sed 's/^/[container-log] /' || true
+  fi
+  docker stop "$id" >/dev/null || return 1
+  [[ "$(docker inspect --format '{{.State.Running}} {{.State.Restarting}}' "$id")" = 'false false' ]] || return 1
+  docker rm "$id" >/dev/null || return 1
+  [[ -z "$(target_id)" ]]
+}
 finish() {
   local cause=$? result=30 rollback_workers=''
   set +e
   trap - EXIT INT TERM
   if [[ "$complete" = true ]]; then result=0
+  elif [[ "$mode" = cleanup && "$attempted" = true ]]; then
+    result=30
+    log "Cleanup failed (command status $cause)"
   elif [[ "$switched" = true ]]; then
     result=40
-    log 'Cutover was verified; old-app cleanup could not be verified. No automatic rollback or further stops.'
+    log 'Cutover was verified; a later check failed. No automatic rollback or further stops; both apps are left running.'
   elif [[ "$attempted" = true ]]; then
     log "Deployment failed (command status $cause)"
     if [[ "$changed" = true ]]; then
@@ -204,7 +270,8 @@ finish() {
     log "Previous configuration retained at $backup"
   else
     if [[ -n "$backup" ]]; then rm -f "$backup"; fi
-    if [[ "$result" -ne 0 ]]; then log 'Previous route verified; failed new container stopped or absent'; fi
+    if [[ ( "$result" -eq 10 || "$result" -eq 20 ) && "$mode" = deploy ]]; then log 'Previous route verified; failed new container stopped or absent'; fi
+    if [[ ( "$result" -eq 10 || "$result" -eq 20 ) && "$mode" = rollback ]]; then log 'Previous route verified; both containers left running'; fi
   fi
   if [[ -n "$candidate" ]]; then rm -f "$candidate"; fi
   exit "$result"
@@ -213,12 +280,36 @@ trap finish EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-compose config --quiet >/dev/null 2>&1 || fail 'Compose configuration invalid; no new container started'
-attempted=true
-log "Starting inactive $target from the prepared image"
-compose up -d --no-deps --no-build --pull never "$target"
-remember_target || fail 'Could not identify this deployment container'
-[[ -n "$owned_id" ]] || fail 'Compose did not create a target container'
+if [[ "$mode" = cleanup ]]; then
+  if [[ -z "$before_id" ]]; then
+    log "No $target_name container to remove"
+  else
+    require_no_draining || preflight_fail 'Nginx is still finishing earlier requests; retry later'
+    attempted=true
+    log "Removing $target_name, which receives no traffic"
+    remove_idle_target "$before_id" || fail "Could not remove $target_name"
+  fi
+  complete=true
+  log "Cleanup complete: $previous keeps serving"
+  exit 0
+fi
+
+if [[ "$mode" = deploy ]]; then
+  compose config --quiet >/dev/null 2>&1 || fail 'Compose configuration invalid; no new container started'
+  if [[ -n "$before_id" ]]; then
+    require_no_draining || preflight_fail 'Nginx is still finishing earlier requests; no new container started'
+    log "Removing the idle $target_name left by an earlier deployment"
+    remove_idle_target "$before_id" || preflight_fail 'Could not remove the idle container; no new container started'
+  fi
+  attempted=true
+  log "Starting inactive $target from the prepared image"
+  compose up -d --no-deps --no-build --pull never "$target"
+else
+  attempted=true
+  log "Switching back to $target, which is still running"
+fi
+remember_target || fail 'Could not identify the target container'
+[[ -n "$owned_id" ]] || fail 'The target container does not exist'
 for mapping in "8080:$app_port" "8081:$health_port"; do
   inside="${mapping%%:*}"; outside="${mapping##*:}"
   [[ "$(docker inspect --format "{{range index .NetworkSettings.Ports \"$inside/tcp\"}}{{.HostIp}}:{{.HostPort}} {{end}}" "$owned_id")" = "127.0.0.1:$outside " ]] || fail 'Unexpected target port binding'
@@ -249,11 +340,9 @@ log "Cutover to $target verified; waiting for previous requests to finish"
 wait_for_drain "$target_ip" "$before_switch" || fail 'Previous requests did not drain or the new route could not be verified'
 [[ "$(cat "$active")" = "server $target:8080;" ]] || fail 'active.conf changed after cutover'
 [[ "$(docker inspect --format '{{.Id}}' "$target_name")" = "$owned_id" ]] || fail 'Selected container was replaced after cutover'
+# The previous app stays up so that rollback is only an nginx switch. Remove it with
+# the cleanup mode, or the next deployment removes it before starting its own slot.
 [[ "$(docker inspect --format '{{.Id}} {{.State.StartedAt}}' "bibbidi-$previous")" = "$previous_instance" ]] || fail 'Previous container changed after cutover'
-[[ "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}} {{index .Config.Labels "com.docker.compose.service"}}' "$previous_id")" = "$project $previous" ]] || fail 'Previous container ownership does not match'
-proxy_uses "$target_ip" "$before_switch" || fail 'Cannot verify selected route before stopping previous app'
-log "Stopping drained $previous container"
-docker stop "$previous_id" >/dev/null
-[[ "$(docker inspect --format '{{.State.Running}} {{.State.Restarting}}' "$previous_id")" = 'false false' ]] || fail 'Previous container stop could not be verified'
+proxy_uses "$target_ip" "$before_switch" || fail 'Cannot verify selected route after cutover'
 complete=true
-log "Deployment complete: $target is selected and the previous container is stopped"
+log "$mode complete: $target is selected and $previous keeps running without traffic"
