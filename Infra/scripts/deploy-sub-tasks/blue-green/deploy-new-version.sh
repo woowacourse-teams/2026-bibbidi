@@ -33,7 +33,7 @@ compose() {
   BIBBIDI_BASE_COMPOSE_FILE="$base" IMAGE_TAG="$tag" BLUE_IMAGE_TAG="$tag" GREEN_IMAGE_TAG="$tag" \
     docker compose --project-name "$project" --project-directory "$app_dir" \
       --env-file "$app_dir/.env" --env-file "$app_dir/infra/monitoring/.env.alloy" \
-      -f "$base" -f "$overlay" --profile "$slot" "$@"
+      -f "$base" -f "$overlay" --profile "$deploy_slot" "$@"
 }
 
 # 이전 경로를 다시 확인한 뒤에만 호출된다. 정지 대기 시간은 Compose의 stop_grace_period를 따른다.
