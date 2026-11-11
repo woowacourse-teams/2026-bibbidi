@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelTarget;
 import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRouter;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
+import com.bibbidi.wedding.chat.adapter.ai.memory.StoredConversationRestorer;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
@@ -239,7 +240,7 @@ class SpringAiConversationFallbackTest {
         ModelClassifier classifier = mock(ModelClassifier.class);
         when(classifier.classify(anyString(), anyString())).thenReturn(Mono.just(ModelClassifier.Classification.allow(initial)));
         return new SpringAiConversationAdapter(new SpringAiChatClient(new ChatModelRouter(targets)),
-                new JacksonChatAnswerParser(MAPPER), memory, classifier);
+                new JacksonChatAnswerParser(MAPPER), memory, mock(StoredConversationRestorer.class), classifier);
     }
 
     private ChatModelTarget target(ChatModelTier tier,

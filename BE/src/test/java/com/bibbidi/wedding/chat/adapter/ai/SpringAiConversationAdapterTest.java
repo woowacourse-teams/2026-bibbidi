@@ -1,15 +1,19 @@
 package com.bibbidi.wedding.chat.adapter.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRequest;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
+import com.bibbidi.wedding.chat.adapter.ai.memory.StoredConversationRestorer;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
@@ -62,6 +66,7 @@ class SpringAiConversationAdapterTest {
     private volatile Function<Prompt, Flux<ChatResponse>> responder = _ -> Flux.empty();
     private ChatMemory chatMemory;
     private ModelClassifier classifier;
+    private StoredConversationRestorer restorer;
     private SpringAiConversationAdapter springAiConversationAdapter;
 
     @BeforeEach
@@ -75,9 +80,10 @@ class SpringAiConversationAdapterTest {
                 .maxMessages(18)
                 .build();
         classifier = mock(ModelClassifier.class);
+        restorer = mock(StoredConversationRestorer.class);
         when(classifier.classify(anyString(), anyString())).thenReturn(Mono.just(Classification.allow(ChatModelTier.LOW)));
         springAiConversationAdapter = new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model,
-                chatMemory), new JacksonChatAnswerParser(MAPPER), chatMemory, classifier);
+                chatMemory), new JacksonChatAnswerParser(MAPPER), chatMemory, restorer, classifier);
     }
 
     @Test
@@ -93,6 +99,37 @@ class SpringAiConversationAdapterTest {
         // then
         List<Message> instructions = receivedPrompts.getLast().getInstructions();
         assertThat(instructions).extracting(Message::getText).containsExactly("예산은 1000", "알겠습니다.", "추천해줘");
+    }
+
+    @Test
+    @DisplayName("저장된 대화를 기억으로 복원하면 이어지는 질문에 이전 맥락을 전달한다")
+    void passesRestoredConversationToTheModel() {
+        // given
+        doAnswer(invocation -> {
+            chatMemory.add(CONVERSATION, List.of(new UserMessage("예식일은 12월 5일"), new AssistantMessage("기억해 둘게요.")));
+            return null;
+        }).when(restorer).restoreIfAbsent(CONVERSATION);
+        respondWith(Flux.just(chunk(answerJson("12월 5일입니다"))));
+
+        // when
+        springAiConversationAdapter.restoreContext(CONVERSATION).block();
+        springAiConversationAdapter.stream(USER_ID, CONVERSATION, "예식일이 언제였지?").blockLast();
+
+        // then
+        List<Message> instructions = receivedPrompts.getLast().getInstructions();
+        assertThat(instructions).extracting(Message::getText)
+                .containsExactly("예식일은 12월 5일", "기억해 둘게요.", "예식일이 언제였지?");
+    }
+
+    @Test
+    @DisplayName("대화 맥락 복원에 실패해도 오류를 전파하지 않는다")
+    void doesNotPropagateRestoreFailure() {
+        // given
+        doThrow(new IllegalStateException("db down")).when(restorer).restoreIfAbsent(CONVERSATION);
+
+        // when & then
+        assertThatCode(() -> springAiConversationAdapter.restoreContext(CONVERSATION).block())
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -231,7 +268,7 @@ class SpringAiConversationAdapterTest {
     private SpringAiConversationAdapter adapterWith(SpringAiChatClient client) {
         ModelClassifier classifier = mock(ModelClassifier.class);
         when(classifier.classify(anyString(), anyString())).thenReturn(Mono.just(Classification.allow(ChatModelTier.LOW)));
-        return new SpringAiConversationAdapter(client, new JacksonChatAnswerParser(MAPPER), chatMemory, classifier);
+        return new SpringAiConversationAdapter(client, new JacksonChatAnswerParser(MAPPER), chatMemory, mock(StoredConversationRestorer.class), classifier);
     }
 
     @Test

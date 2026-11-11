@@ -2,6 +2,7 @@ package com.bibbidi.wedding.chat.repository;
 
 import com.bibbidi.wedding.chat.domain.ChatTurnRecord;
 import com.bibbidi.wedding.chat.persistence.JpaChatTurnEntity;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -18,6 +19,20 @@ public class ChatTurnMapper {
                 record.outcomeReason(),
                 record.startedAt(),
                 record.durationMs()
+        );
+    }
+
+    public ChatTurnRecord toRecord(JpaChatTurnEntity entity) {
+        return new ChatTurnRecord(
+                entity.userId(),
+                UUID.fromString(entity.conversationId()),
+                entity.userPrompt(),
+                entity.completion(),
+                entity.model(),
+                entity.outcome(),
+                entity.outcomeReason(),
+                entity.startedAt(),
+                entity.durationMs()
         );
     }
 }
