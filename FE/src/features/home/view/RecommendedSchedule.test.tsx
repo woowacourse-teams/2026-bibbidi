@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter } from "../../../test/memoryNavigation";
 import { describe, expect, it, vi } from "vitest";
 import { RecommendedSchedule } from "./RecommendedSchedule";
 import type { RecommendedScheduleItemViewModel } from "../view-model/createRecommendedScheduleViewModel";

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useSearchParams } from "../../app/navigation/navigation";
 
 import type {
   CalendarPlanningLoadState,

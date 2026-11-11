@@ -1,7 +1,10 @@
 import { CatalogModel } from "../model/catalog";
 import { parseCatalogResponse } from "./catalogResponse";
 
-const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
+const apiBaseUrl = (process.env.NEXT_PUBLIC_BIBBIDI_API_BASE_URL ?? "").replace(
+  /\/+$/,
+  "",
+);
 const CATALOG_ENDPOINT = `${apiBaseUrl}/api/catalog`;
 const CATALOG_REQUEST_TIMEOUT_MS = 10_000;
 

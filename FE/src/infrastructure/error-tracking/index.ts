@@ -29,14 +29,18 @@ let initialized = false;
 let lastPagePath: string | null = null;
 
 export function initializeErrorTracking(): void {
-  if (initialized || !__BIBBIDI_SENTRY_ENABLED__ || !__BIBBIDI_SENTRY_DSN__)
+  if (
+    initialized ||
+    process.env.NEXT_PUBLIC_BIBBIDI_SENTRY_ENABLED !== "true" ||
+    !process.env.NEXT_PUBLIC_BIBBIDI_SENTRY_DSN
+  )
     return;
 
   try {
     Sentry.init({
-      dsn: __BIBBIDI_SENTRY_DSN__,
-      environment: __BIBBIDI_APP_ENV__,
-      release: __BIBBIDI_APP_VERSION__,
+      dsn: process.env.NEXT_PUBLIC_BIBBIDI_SENTRY_DSN,
+      environment: process.env.NEXT_PUBLIC_BIBBIDI_APP_ENV ?? "",
+      release: process.env.NEXT_PUBLIC_BIBBIDI_APP_VERSION ?? "",
       maxBreadcrumbs: 20,
       beforeBreadcrumb: safeSentryBreadcrumb,
       beforeSend: sanitizeSentryEvent,

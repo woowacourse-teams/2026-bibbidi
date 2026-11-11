@@ -14,7 +14,10 @@ import {
 } from "./remoteAppointmentManagementDataSource";
 import { isValidLocalDateTime } from "../../../shared/validation/isValidLocalDateTime";
 
-const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
+const apiBaseUrl = (process.env.NEXT_PUBLIC_BIBBIDI_API_BASE_URL ?? "").replace(
+  /\/+$/,
+  "",
+);
 const CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists`;
 const CUSTOM_CHECKLIST_ITEM_ENDPOINT = `${CHECKLIST_ENDPOINT}/me/items`;
 const CHECKLIST_ITEM_ENDPOINT = `${apiBaseUrl}/api/checklist-items`;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { Link, MemoryRouter, useNavigate } from "react-router";
+import { Link, MemoryRouter, useNavigate } from "../test/memoryNavigation";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppHeader } from "./AppHeader";

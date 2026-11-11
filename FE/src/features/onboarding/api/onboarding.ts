@@ -1,7 +1,10 @@
 import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 import { OnboardingTerm } from "../model/onboarding";
 
-const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
+const apiBaseUrl = (process.env.NEXT_PUBLIC_BIBBIDI_API_BASE_URL ?? "").replace(
+  /\/+$/,
+  "",
+);
 const TERMS_ENDPOINT = `${apiBaseUrl}/api/terms`;
 const TERMS_AGREEMENT_ENDPOINT = `${apiBaseUrl}/api/users/me/terms-agreement`;
 const ONBOARDING_REQUEST_TIMEOUT_MS = 10_000;

@@ -13,13 +13,13 @@ vi.mock("@sentry/react", () => sentry);
 
 describe("FE 오류 추적", () => {
   it("정제된 사용자·화면 문맥과 심각도를 전송하고 로그아웃 시 사용자를 지운다", async () => {
-    vi.stubGlobal("__BIBBIDI_SENTRY_ENABLED__", true);
-    vi.stubGlobal(
-      "__BIBBIDI_SENTRY_DSN__",
+    vi.stubEnv("NEXT_PUBLIC_BIBBIDI_SENTRY_ENABLED", "true");
+    vi.stubEnv(
+      "NEXT_PUBLIC_BIBBIDI_SENTRY_DSN",
       "https://public@example.ingest.sentry.io/1",
     );
-    vi.stubGlobal("__BIBBIDI_APP_ENV__", "development");
-    vi.stubGlobal("__BIBBIDI_APP_VERSION__", "test-commit");
+    vi.stubEnv("NEXT_PUBLIC_BIBBIDI_APP_ENV", "development");
+    vi.stubEnv("NEXT_PUBLIC_BIBBIDI_APP_VERSION", "test-commit");
     const mockScope = { setLevel: vi.fn(), setTag: vi.fn() };
     sentry.withScope.mockImplementation(
       (callback: (scope: typeof mockScope) => void) => callback(mockScope),
@@ -60,6 +60,6 @@ describe("FE 오류 추적", () => {
     expect(mockScope.setLevel).toHaveBeenCalledWith("error");
     expect(mockScope.setTag).toHaveBeenCalledWith("failure_kind", "network");
     expect(sentry.captureException).toHaveBeenCalledWith(failure);
-    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 });

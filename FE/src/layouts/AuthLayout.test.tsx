@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Outlet, Route, Routes } from "../test/memoryNavigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../features/auth";
@@ -40,7 +40,13 @@ describe("AuthLayout", () => {
         <ChecklistMigrationProvider>
           <MemoryRouter initialEntries={["/login"]}>
             <Routes>
-              <Route element={<AuthLayout />}>
+              <Route
+                element={
+                  <AuthLayout>
+                    <Outlet />
+                  </AuthLayout>
+                }
+              >
                 <Route path="/login" element={<h1>로그인 페이지</h1>} />
               </Route>
               <Route path="/" element={<h1>홈 페이지</h1>} />

@@ -1,2 +1,6 @@
 dist
 *.md
+
+.next
+out
+next-env.d.ts

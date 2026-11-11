@@ -4,7 +4,7 @@ import type {
   BalanceGameResult,
 } from "../model/balanceGame";
 
-const endpoint = `${__BIBBIDI_API_BASE_URL__.replace(/\/+$/, "")}/api/balance-game`;
+const endpoint = `${(process.env.NEXT_PUBLIC_BIBBIDI_API_BASE_URL ?? "").replace(/\/+$/, "")}/api/balance-game`;
 
 export class BalanceGameApiError extends Error {
   constructor(

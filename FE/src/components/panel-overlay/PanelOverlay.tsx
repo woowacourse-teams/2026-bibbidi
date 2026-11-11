@@ -1,3 +1,4 @@
+import { useHydrated } from "../../shared/browser/useHydrated";
 import { useRef } from "react";
 import type { ComponentPropsWithoutRef, ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
@@ -69,8 +70,9 @@ export function PanelOverlay({
 }: PanelOverlayProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const hydrated = useHydrated();
   const ready = useNativeModalLifecycle({
-    open,
+    open: hydrated && open,
     deferContents: true,
     dialogRef,
     surfaceRef,
@@ -100,7 +102,7 @@ export function PanelOverlay({
     onClick,
   });
 
-  if (typeof document === "undefined") return null;
+  if (!hydrated) return null;
   return createPortal(
     <dialog
       {...props}

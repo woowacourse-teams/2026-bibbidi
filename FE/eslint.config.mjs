@@ -8,7 +8,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
-  globalIgnores(["dist/**"]),
+  globalIgnores(["dist/**", ".next/**", "out/**", "next-env.d.ts"]),
   {
     files: ["**/*.config.js"],
     extends: [js.configs.recommended],
@@ -20,9 +20,10 @@ export default defineConfig([
   {
     files: ["**/*.config.mjs"],
     extends: [js.configs.recommended],
+    languageOptions: { globals: globals.node },
   },
   {
-    files: ["src/**/*.{ts,tsx}"],
+    files: ["{app,src}/**/*.{ts,tsx}", "instrumentation-client.ts"],
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,

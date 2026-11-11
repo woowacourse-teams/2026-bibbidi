@@ -7,7 +7,10 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import {
+  createMemoryRouter,
+  RouterProvider,
+} from "../../test/memoryNavigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PreparationAuthenticationRequiredError } from "../preparation";
 import { BalanceGameFeature } from "./BalanceGameFeature";

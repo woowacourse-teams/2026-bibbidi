@@ -31,3 +31,7 @@ coverage/
 ._*
 Thumbs.db
 Desktop.ini
+
+.next/
+out/
+next-env.d.ts

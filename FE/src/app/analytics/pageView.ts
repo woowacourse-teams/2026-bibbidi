@@ -59,6 +59,27 @@ function createPageLocation(origin: string, pagePath: PagePath) {
   return new URL(pagePath, normalizedOrigin).href;
 }
 
+const campaignKeys = new Set([
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_content",
+  "utm_term",
+  "utm_id",
+  "gclid",
+  "dclid",
+  "gbraid",
+  "wbraid",
+]);
+
+function campaignQuery(search: string) {
+  const campaign = new URLSearchParams();
+  for (const [key, value] of new URLSearchParams(search)) {
+    if (campaignKeys.has(key)) campaign.append(key, value);
+  }
+  return campaign.size ? `?${campaign}` : "";
+}
+
 // 앱을 처음 불러온 주소다. GA는 첫 페이지뷰의 쿼리(UTM)와 referrer로 유입 채널을 정한다.
 export interface LandingPage {
   pathname: string;
@@ -84,7 +105,7 @@ export function createPageViewEvent({
   return {
     name: "page_view",
     parameters: {
-      page_location: `${createPageLocation(origin, pagePath)}${landingPage?.search ?? ""}`,
+      page_location: `${createPageLocation(origin, pagePath)}${campaignQuery(landingPage?.search ?? "")}`,
       page_path: pagePath,
       page_referrer: referrerPath
         ? createPageLocation(origin, referrerPath)

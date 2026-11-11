@@ -1,5 +1,11 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useLocation, useNavigate } from "../app/navigation/navigation";
 
 import { AiChatSessionProvider } from "../features/ai-chat/AiChatSession";
 import { AppLayout } from "../components/app-layout";
@@ -11,8 +17,10 @@ import "./ServiceLayout.css";
 import { useIsMobileLayout } from "../shared/responsive";
 
 export function ServiceLayout({
+  children,
   showNavigationDock = true,
 }: {
+  children?: ReactNode;
   showNavigationDock?: boolean;
 }) {
   const { authState, endAuthentication, refreshAuth } = useAuth();
@@ -94,9 +102,9 @@ export function ServiceLayout({
           onAuthenticationRequired={refreshAuth}
           onKeyboardVisibilityChange={setAiKeyboardVisible}
         >
-          {isAiChat && <Outlet />}
+          {isAiChat && children}
         </AiChatSessionProvider>
-        {!isAiChat && <Outlet />}
+        {!isAiChat && children}
       </div>
 
       {showNavigationDock && (

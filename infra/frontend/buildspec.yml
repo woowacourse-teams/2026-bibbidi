@@ -21,6 +21,11 @@ phases:
       - |
         set -euo pipefail
 
+        if [ -f FE/next.config.mjs ]; then
+          echo "Next.js export deployment requires the frontend static hosting migration." >&2
+          exit 1
+        fi
+
         required_variables=(
           CLOUDFRONT_DISTRIBUTION_ID
           FE_SERVICE_URL

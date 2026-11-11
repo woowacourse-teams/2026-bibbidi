@@ -1,6 +1,9 @@
 import { clearWebAccessToken } from "../../../infrastructure/auth/webSessionManager";
 
-const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
+const apiBaseUrl = (process.env.NEXT_PUBLIC_BIBBIDI_API_BASE_URL ?? "").replace(
+  /\/+$/,
+  "",
+);
 const LOGOUT_ENDPOINT = `${apiBaseUrl}/api/auth/web/sessions/current`;
 const LOGOUT_TIMEOUT_MS = 10_000;
 

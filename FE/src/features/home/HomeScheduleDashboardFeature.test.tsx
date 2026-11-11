@@ -7,7 +7,7 @@ import {
   within,
 } from "@testing-library/react";
 import { StrictMode } from "react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter } from "../../test/memoryNavigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuth } from "../auth";

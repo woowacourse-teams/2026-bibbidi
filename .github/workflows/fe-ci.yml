@@ -26,6 +26,8 @@ jobs:
     name: Lint, format, typecheck, test, and build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
       - name: Checkout repository
@@ -57,5 +59,14 @@ jobs:
       - name: Test
         run: pnpm --filter bibbidi-fe test
 
-      - name: Build
+      - name: Build static export
         run: pnpm --filter bibbidi-fe build
+
+      - name: Verify public export
+        run: |
+          test -f FE/out/index.html
+          test -f FE/out/404.html
+          if [ -n "$(find FE/out -type f -name '*.map' -print -quit)" ]; then
+            echo "Source maps must not be present in the public export." >&2
+            exit 1
+          fi

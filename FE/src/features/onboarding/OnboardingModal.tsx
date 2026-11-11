@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate } from "../../app/navigation/navigation";
 
 import {
   consumeLoginReturnPath,

@@ -1,7 +1,10 @@
 import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 import { isValidWeddingDate } from "../model/weddingDate";
 
-const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
+const apiBaseUrl = (process.env.NEXT_PUBLIC_BIBBIDI_API_BASE_URL ?? "").replace(
+  /\/+$/,
+  "",
+);
 const WEDDING_DATE_ENDPOINT = `${apiBaseUrl}/api/users/me/wedding-date`;
 const REQUEST_TIMEOUT_MS = 10_000;
 

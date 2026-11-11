@@ -1,4 +1,7 @@
-const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
+const apiBaseUrl = (process.env.NEXT_PUBLIC_BIBBIDI_API_BASE_URL ?? "").replace(
+  /\/+$/,
+  "",
+);
 const WEB_SESSION_REFRESH_ENDPOINT = `${apiBaseUrl}/api/auth/web/sessions/refresh`;
 const WEB_SESSION_REFRESH_TIMEOUT_MS = 10_000;
 

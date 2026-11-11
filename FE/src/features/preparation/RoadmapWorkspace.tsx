@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useSearchParams } from "react-router";
+import { useSearchParams } from "../../app/navigation/navigation";
 import "./view/RoadmapWorkspace.css";
 
 export function RoadmapWorkspace({

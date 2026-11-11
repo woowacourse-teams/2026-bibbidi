@@ -1,11 +1,12 @@
-import { Navigate, Outlet, useLocation } from "react-router";
+import type { ReactNode } from "react";
+import { Navigate, useLocation } from "../app/navigation/navigation";
 
 import { AppLayout } from "../components/app-layout";
 import { getSafeLoginReturnPath, useAuth } from "../features/auth";
 import { BrandHeader } from "./BrandHeader";
 import "./AuthLayout.css";
 
-export function AuthLayout() {
+export function AuthLayout({ children }: { children?: ReactNode }) {
   const { authState } = useAuth();
   const { pathname, search } = useLocation();
   const isOnboardingPath =
@@ -39,7 +40,7 @@ export function AuthLayout() {
         authState.status === "synchronizing" ? (
           <p role="status">로그인 상태를 확인하고 있습니다.</p>
         ) : (
-          <Outlet />
+          children
         )}
       </main>
     </AppLayout>

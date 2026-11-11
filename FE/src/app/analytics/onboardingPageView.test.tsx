@@ -1,6 +1,9 @@
 import { act, render } from "@testing-library/react";
 import { StrictMode } from "react";
-import { createMemoryRouter } from "react-router";
+import {
+  createMemoryRouter,
+  RouterProvider,
+} from "../../test/memoryNavigation";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthState } from "../../features/auth/model/auth";
 import { AppPageViewTracker } from "./AppPageViewTracker";
@@ -24,11 +27,9 @@ describe("온보딩 페이지 계측", () => {
     auth.state = { status: "onboardingRequired" };
     const element = () => (
       <StrictMode>
-        <AppPageViewTracker
-          analytics={analytics}
-          origin="https://example.com"
-          router={router}
-        />
+        <RouterProvider router={router}>
+          <AppPageViewTracker client={analytics} origin="https://example.com" />
+        </RouterProvider>
       </StrictMode>
     );
     const view = render(element());
@@ -77,11 +78,9 @@ describe("온보딩 페이지 계측", () => {
       initialEntries: ["/auth/kakao?code=secret&state=secret"],
     });
     render(
-      <AppPageViewTracker
-        analytics={analytics}
-        origin="https://example.com"
-        router={router}
-      />,
+      <RouterProvider router={router}>
+        <AppPageViewTracker client={analytics} origin="https://example.com" />
+      </RouterProvider>,
     );
     expect(analytics.track).not.toHaveBeenCalled();
   });
