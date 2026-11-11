@@ -9,6 +9,7 @@ import java.util.List;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.stereotype.Component;
 
@@ -31,8 +32,8 @@ public class StoredConversationRestorer {
         this.turnLimit = properties.memoryMaxMessages() / MESSAGES_PER_TURN;
     }
 
-    public void restoreIfAbsent(String conversationKey) {
-        if (!chatMemory.get(conversationKey).isEmpty()) {
+    public void restoreIfNoCompletedTurn(String conversationKey) {
+        if (hasCompletedExchange(chatMemory.get(conversationKey))) {
             return;
         }
         List<ChatTurnRecord> turns = historyService.findRecentCompletedTurns(
@@ -45,6 +46,11 @@ public class StoredConversationRestorer {
             messages.add(new UserMessage(turn.userPrompt()));
             messages.add(new AssistantMessage(turn.completion()));
         }
+        chatMemory.clear(conversationKey);
         chatMemory.add(conversationKey, messages);
+    }
+
+    private boolean hasCompletedExchange(List<Message> messages) {
+        return messages.stream().anyMatch(message -> message.getMessageType() == MessageType.ASSISTANT);
     }
 }

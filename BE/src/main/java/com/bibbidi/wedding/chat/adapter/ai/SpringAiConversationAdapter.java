@@ -91,7 +91,7 @@ public class SpringAiConversationAdapter implements AiConversationPort {
 
     @Override
     public Mono<Void> restoreContext(String conversationKey) {
-        return Mono.<Void>fromRunnable(() -> restorer.restoreIfAbsent(conversationKey))
+        return Mono.<Void>fromRunnable(() -> restorer.restoreIfNoCompletedTurn(conversationKey))
                 .subscribeOn(Schedulers.boundedElastic())
                 .onErrorResume(error -> {
                     log.warn("저장된 대화 맥락 복원 실패. type={}", error.getClass().getSimpleName());

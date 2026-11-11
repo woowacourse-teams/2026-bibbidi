@@ -59,7 +59,7 @@ class StoredConversationRestorerTest {
                 .thenReturn(List.of(turn("예식일은 12월 5일이야", "알겠습니다."), turn("홀 추천해줘", "추천드릴게요.")));
 
         // when
-        restorer.restoreIfAbsent(KEY);
+        restorer.restoreIfNoCompletedTurn(KEY);
 
         // then
         List<Message> restored = chatMemory.get(KEY);
@@ -78,11 +78,42 @@ class StoredConversationRestorerTest {
         chatMemory.add(KEY, List.of(new UserMessage("메모리 질문"), new AssistantMessage("메모리 답변")));
 
         // when
-        restorer.restoreIfAbsent(KEY);
+        restorer.restoreIfNoCompletedTurn(KEY);
 
         // then
         verify(historyService, never()).findRecentCompletedTurns(any(), anyInt());
         assertThat(chatMemory.get(KEY)).extracting(Message::getText).containsExactly("메모리 질문", "메모리 답변");
+    }
+
+    @Test
+    @DisplayName("미완료 질문만 남아 있으면 그 질문을 버리고 저장된 완료 턴으로 복원한다")
+    void replacesDanglingUserMessageWithStoredCompletedTurns() {
+        // given
+        chatMemory.add(KEY, List.of(new UserMessage("실패한 질문")));
+        when(historyService.findRecentCompletedTurns(
+                new ConversationKey(USER_ID, CONVERSATION_ID), MEMORY_MAX_MESSAGES / 2))
+                .thenReturn(List.of(turn("예식일은 12월 5일이야", "알겠습니다.")));
+
+        // when
+        restorer.restoreIfNoCompletedTurn(KEY);
+
+        // then
+        assertThat(chatMemory.get(KEY)).extracting(Message::getText)
+                .containsExactly("예식일은 12월 5일이야", "알겠습니다.");
+    }
+
+    @Test
+    @DisplayName("미완료 질문만 있고 저장된 완료 턴도 없으면 기억을 그대로 둔다")
+    void keepsDanglingUserMessageWhenNothingIsStored() {
+        // given
+        chatMemory.add(KEY, List.of(new UserMessage("실패한 질문")));
+        when(historyService.findRecentCompletedTurns(any(), anyInt())).thenReturn(List.of());
+
+        // when
+        restorer.restoreIfNoCompletedTurn(KEY);
+
+        // then
+        assertThat(chatMemory.get(KEY)).extracting(Message::getText).containsExactly("실패한 질문");
     }
 
     @Test
@@ -92,7 +123,7 @@ class StoredConversationRestorerTest {
         when(historyService.findRecentCompletedTurns(any(), anyInt())).thenReturn(List.of());
 
         // when
-        restorer.restoreIfAbsent(KEY);
+        restorer.restoreIfNoCompletedTurn(KEY);
 
         // then
         assertThat(chatMemory.get(KEY)).isEmpty();

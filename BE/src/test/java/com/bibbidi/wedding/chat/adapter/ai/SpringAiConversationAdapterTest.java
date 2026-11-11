@@ -108,7 +108,7 @@ class SpringAiConversationAdapterTest {
         doAnswer(invocation -> {
             chatMemory.add(CONVERSATION, List.of(new UserMessage("예식일은 12월 5일"), new AssistantMessage("기억해 둘게요.")));
             return null;
-        }).when(restorer).restoreIfAbsent(CONVERSATION);
+        }).when(restorer).restoreIfNoCompletedTurn(CONVERSATION);
         respondWith(Flux.just(chunk(answerJson("12월 5일입니다"))));
 
         // when
@@ -125,7 +125,7 @@ class SpringAiConversationAdapterTest {
     @DisplayName("대화 맥락 복원에 실패해도 오류를 전파하지 않는다")
     void doesNotPropagateRestoreFailure() {
         // given
-        doThrow(new IllegalStateException("db down")).when(restorer).restoreIfAbsent(CONVERSATION);
+        doThrow(new IllegalStateException("db down")).when(restorer).restoreIfNoCompletedTurn(CONVERSATION);
 
         // when & then
         assertThatCode(() -> springAiConversationAdapter.restoreContext(CONVERSATION).block())
