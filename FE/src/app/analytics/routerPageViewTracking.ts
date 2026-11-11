@@ -68,7 +68,6 @@ export function startRouterPageViewTracking(
   analytics: AnalyticsClient,
   origin: string,
   trackingState = createRouterPageViewTrackingState(),
-  deferHomeEntry = false,
 ) {
   const trackRouterState = (state: RouterStateSnapshot) => {
     if (!state.initialized || state.navigation.state !== "idle") {
@@ -77,7 +76,7 @@ export function startRouterPageViewTracking(
 
     const pagePath = normalizePagePath(state.location.pathname);
 
-    if (!pagePath || (deferHomeEntry && pagePath === "/")) return;
+    if (!pagePath) return;
     trackPageView(pagePath, analytics, origin, trackingState);
   };
 

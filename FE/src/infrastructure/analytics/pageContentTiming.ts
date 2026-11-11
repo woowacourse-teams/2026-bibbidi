@@ -14,6 +14,7 @@ export interface TimingRouter {
 export function startPageContentTiming(
   router: TimingRouter,
   track: (event: AnalyticsEvent) => void,
+  measure: "content" | "personal" = "content",
 ) {
   if (typeof MutationObserver === "undefined") return () => {};
   let pathname = "";
@@ -39,7 +40,10 @@ export function startPageContentTiming(
     observer.disconnect();
     try {
       track({
-        name: "page_content_timing",
+        name:
+          measure === "personal"
+            ? "personal_preparation_timing"
+            : "page_content_timing",
         parameters: {
           page_path: current.path,
           screen_name: "preparation_catalog",
@@ -50,6 +54,7 @@ export function startPageContentTiming(
             Math.round(performance.now() - current.startedAt),
           ),
           outcome,
+          ...(measure === "personal" ? { measurement_version: 1 } : {}),
         },
       });
     } catch {
@@ -57,11 +62,22 @@ export function startPageContentTiming(
     }
   };
   const contentOutcome = () => {
+    if (measure === "personal") {
+      const personalState = root
+        .querySelector(
+          ".preparation-catalog-page [data-personal-preparation-state]",
+        )
+        ?.getAttribute("data-personal-preparation-state");
+      if (personalState === "ready") return "success";
+      if (personalState === "guest" || personalState === "error")
+        return personalState;
+    }
     const state = root
       .querySelector(".preparation-catalog-page [data-page-content-state]")
       ?.getAttribute("data-page-content-state");
     return state &&
-      ["success", "empty", "error", "authentication-required"].includes(state)
+      ((state === "success" && measure === "content") ||
+        ["empty", "error", "authentication-required"].includes(state))
       ? state.replaceAll("-", "_")
       : null;
   };
@@ -103,7 +119,10 @@ export function startPageContentTiming(
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ["data-page-content-state"],
+      attributeFilter:
+        measure === "personal"
+          ? ["data-page-content-state", "data-personal-preparation-state"]
+          : ["data-page-content-state"],
     });
     checkContent();
   };

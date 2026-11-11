@@ -1,7 +1,6 @@
 import { createAnalyticsClient } from "./analytics";
 import { createGoogleAnalyticsProvider } from "./googleAnalyticsProvider";
 import { createPostHogProvider } from "./posthogProvider";
-import type { HomeEntryVariant } from "./homeEntryExperiment";
 import { startPageContentTiming, type TimingRouter } from "./pageContentTiming";
 
 const googleAnalyticsMeasurementId =
@@ -31,18 +30,18 @@ if (
 export const analytics = createAnalyticsClient(providers);
 
 export function startPagePerformanceTracking(router: TimingRouter) {
-  return posthogProvider
-    ? startPageContentTiming(router, (event) =>
-        posthogProvider?.trackPerformance(event),
-      )
-    : () => {};
-}
-
-export function resolveHomeEntryVariant(): Promise<HomeEntryVariant> {
-  return (
-    posthogProvider?.resolveHomeEntryVariant() ?? Promise.resolve("control")
+  const provider = posthogProvider;
+  if (!provider) return () => {};
+  const stopContent = startPageContentTiming(router, provider.trackPerformance);
+  const stopPersonal = startPageContentTiming(
+    router,
+    provider.trackPerformance,
+    "personal",
   );
+  return () => {
+    stopContent();
+    stopPersonal();
+  };
 }
 
 export type { AnalyticsClient, AnalyticsEvent } from "./analytics";
-export type { HomeEntryVariant } from "./homeEntryExperiment";
