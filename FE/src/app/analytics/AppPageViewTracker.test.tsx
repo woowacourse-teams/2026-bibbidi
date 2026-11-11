@@ -6,27 +6,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../../features/auth";
 import { ChecklistMigrationProvider } from "../../features/checklist-migration";
 import type { AnalyticsClient } from "../../infrastructure/analytics";
-import { resolveHomeEntryVariant } from "../../infrastructure/analytics";
 import { appRoutes } from "../router";
 import { AppPageViewTracker } from "./AppPageViewTracker";
-
-vi.mock("../../infrastructure/analytics", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../infrastructure/analytics")>()),
-  resolveHomeEntryVariant: vi.fn().mockResolvedValue("control"),
-}));
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("AppPageViewTracker", () => {
-  it.each([
-    ["control", "/", "준비 목록"],
-    ["test", "/calendar", "캘린더"],
-  ] as const)(
-    "%s 실험군은 실제 첫 화면 %s만 측정한다",
-    async (variant, expectedPath, expectedScreen) => {
-      vi.mocked(resolveHomeEntryVariant).mockResolvedValue(variant);
+  it.each(["/", "/?categoryId=10"])(
+    "%s 진입에서 준비 목록의 페이지 조회를 한 번만 측정한다",
+    async (entry) => {
       vi.stubGlobal(
         "fetch",
         vi.fn(() =>
@@ -47,7 +37,7 @@ describe("AppPageViewTracker", () => {
         reset: vi.fn(),
         track: vi.fn(),
       };
-      const router = createMemoryRouter(appRoutes, { initialEntries: ["/"] });
+      const router = createMemoryRouter(appRoutes, { initialEntries: [entry] });
 
       render(
         <StrictMode>
@@ -66,12 +56,13 @@ describe("AppPageViewTracker", () => {
       );
 
       expect(
-        await screen.findByRole("main", { name: expectedScreen }),
+        await screen.findByRole("main", { name: "준비 목록" }),
       ).toBeTruthy();
       await waitFor(() => expect(analytics.track).toHaveBeenCalledOnce());
       expect(analytics.track).toHaveBeenCalledWith(
         expect.objectContaining({
-          parameters: expect.objectContaining({ page_path: expectedPath }),
+          name: "page_view",
+          parameters: expect.objectContaining({ page_path: "/" }),
         }),
       );
     },

@@ -52,23 +52,18 @@ describe("PostHog 개인정보 정제", () => {
       }),
     ).toEqual({});
   });
-  it("첫 화면 실험의 노출군만 허용하고 다른 플래그와 임의 속성은 제거한다", () => {
+  it("페이지 조회에 남아 있는 실험 플래그와 임의 속성을 제거한다", () => {
     const result = sanitizePostHogEvent({
       uuid: "test",
-      event: "$feature_flag_called",
+      event: "$pageview",
       properties: {
-        $feature_flag: "home-entry-calendar",
-        $feature_flag_response: "test",
+        page_path: "/",
         "$feature/home-entry-calendar": "test",
         "$feature/other-flag": "secret",
         nickname: "secret",
       },
     });
-    expect(result?.properties).toEqual({
-      $feature_flag: "home-entry-calendar",
-      $feature_flag_response: "test",
-      "$feature/home-entry-calendar": "test",
-    });
+    expect(result?.properties).toEqual({ page_path: "/" });
   });
 
   it("준비 추천의 카탈로그 이름과 단계를 보존한다", () => {
