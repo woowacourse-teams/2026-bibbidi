@@ -3,6 +3,9 @@ name: 비비디 백엔드 공통 CD
 on:
   workflow_call:
     inputs:
+      blue-green:
+        type: boolean
+        default: false
       deployment-environment:
         required: true
         type: string
@@ -114,6 +117,7 @@ jobs:
     env:
       EC2_DEPLOY_PATH: /opt/bibbidi/app
       NGINX_CONFIG_PATH: /opt/bibbidi/app/infra/nginx/nginx.conf
+      NGINX_UPSTREAM_DIR: /opt/bibbidi/app/infra/nginx/upstream
       ALLOY_CONFIG_PATH: /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
       SPRING_ENV_FILE: /opt/bibbidi/app/.env.spring
       ALLOY_ENV_FILE: /opt/bibbidi/app/infra/monitoring/.env.alloy
@@ -148,7 +152,24 @@ jobs:
           -v "$PWD/Infra/monitoring/grafana/alloy/config.alloy:/etc/alloy/config.alloy:ro"
           grafana/alloy:v1.11.0 validate --stability.level=experimental /etc/alloy/config.alloy
 
+      - name: 운영 앱을 Blue/Green으로 배포
+        if: inputs.blue-green
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          IMAGE_TAG: ${{ inputs.image-tag }}
+          SPRING_PROFILES_ACTIVE: ${{ inputs.spring-profile }}
+          DEPLOYMENT_ENVIRONMENT_NAME: ${{ inputs.deployment-name }}
+          OTEL_SERVICE_INSTANCE_ID: ${{ inputs.service-instance-id }}
+          SPRING_ENV_CONTENT: ${{ secrets.BIBBIDI_SPRING_ENV }}
+          NGINX_ENV_CONTENT: ${{ secrets.BIBBIDI_NGINX_ENV }}
+          ALLOY_ENV_CONTENT: ${{ secrets.BIBBIDI_ALLOY_ENV }}
+          HEALTHCHECK_TIMEOUT_SECONDS: '120'
+          PROXY_VERIFY_TIMEOUT_SECONDS: '30'
+          DRAIN_TIMEOUT_SECONDS: '90'
+        run: bash Infra/scripts/deploy-sub-tasks/deploy-prod.sh
+
       - name: Compose와 nginx·Alloy·환경 파일 설치
+        if: ${{ !inputs.blue-green }}
         env:
           SPRING_ENV_CONTENT: ${{ secrets.BIBBIDI_SPRING_ENV }}
           NGINX_ENV_CONTENT: ${{ secrets.BIBBIDI_NGINX_ENV }}
@@ -160,10 +181,14 @@ jobs:
           test -n "$ALLOY_ENV_CONTENT"
           install -d -m 0755 /opt/bibbidi/app/infra/monitoring/alloy
           install -d -m 0755 /opt/bibbidi/app/infra/nginx
+          install -d -m 0755 "$NGINX_UPSTREAM_DIR"
           install -d -m 0755 "$CERTBOT_WEBROOT/.well-known/acme-challenge"
           install -m 0644 BE/compose.prod.yml /opt/bibbidi/app/compose.yaml
           install -m 0644 Infra/monitoring/grafana/alloy/config.alloy /opt/bibbidi/app/infra/monitoring/alloy/config.alloy
           install -m 0644 Infra/nginx/nginx.conf.template /opt/bibbidi/app/infra/nginx/nginx.conf.template
+          if [ ! -e "$NGINX_UPSTREAM_DIR/active.conf" ]; then
+            install -m 0644 Infra/nginx/upstream/active.conf "$NGINX_UPSTREAM_DIR/active.conf"
+          fi
           umask 077
           printf '%s\n' "$SPRING_ENV_CONTENT" > /opt/bibbidi/app/.env.spring
           printf '%s\n' "$NGINX_ENV_CONTENT" > /opt/bibbidi/app/.env.nginx
@@ -171,9 +196,11 @@ jobs:
           chmod 600 /opt/bibbidi/app/.env.spring /opt/bibbidi/app/.env.nginx /opt/bibbidi/app/infra/monitoring/.env.alloy
 
       - name: bibbidi-observability Docker 네트워크 준비
+        if: ${{ !inputs.blue-green }}
         run: docker network inspect bibbidi-observability >/dev/null 2>&1 || docker network create bibbidi-observability
 
       - name: 환경별 도메인으로 nginx 설정 생성
+        if: ${{ !inputs.blue-green }}
         run: |
           set -a
           . /opt/bibbidi/app/.env.nginx
@@ -194,9 +221,11 @@ jobs:
             /opt/bibbidi/app/infra/nginx/nginx.conf
 
       - name: nginx 기동을 위한 TLS 인증서 초기화
+        if: ${{ !inputs.blue-green }}
         run: bash "$TLS_SCRIPT" bootstrap
 
       - name: 배포 후 비즈니스 서버와 nginx 상태 확인
+        if: ${{ !inputs.blue-green }}
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           IMAGE_TAG: ${{ inputs.image-tag }}
@@ -223,6 +252,7 @@ jobs:
           node --experimental-strip-types "$GITHUB_WORKSPACE/.github/be-cd-jobs/deploy-health.ts"
 
       - name: Let's Encrypt TLS 인증서 발급 또는 갱신
+        if: ${{ !inputs.blue-green }}
         id: tls_issue
         continue-on-error: true
         run: bash "$TLS_SCRIPT" issue
@@ -237,6 +267,7 @@ jobs:
         run: node --experimental-strip-types "$GITHUB_WORKSPACE/.github/be-cd-jobs/tls-failure-cli.ts"
 
       - name: certbot 갱신 타이머 설치(1일 2회)
+        if: ${{ !inputs.blue-green }}
         run: |
           sudo tee /etc/systemd/system/bibbidi-certbot-renew.service >/dev/null <<'UNIT'
           [Unit]

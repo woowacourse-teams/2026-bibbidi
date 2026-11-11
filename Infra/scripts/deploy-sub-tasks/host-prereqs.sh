@@ -47,19 +47,33 @@ apt_update_once() {
   fi
 }
 
-ensure_apt_command() {
+install_package() {
+  local apt_package="$1"
+  local dnf_package="$2"
+
+  if have apt-get; then
+    apt_update_once
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$apt_package"
+  elif have dnf; then
+    sudo -n dnf install -y "$dnf_package"
+  else
+    fail "neither apt-get nor dnf is available"
+  fi
+}
+
+ensure_command() {
   local cmd="$1"
-  local pkg="$2"
+  local apt_package="$2"
+  local dnf_package="$3"
 
   if have "$cmd"; then
     log "$cmd: ok"
     return 0
   fi
 
-  log "$cmd missing - installing $pkg"
-  apt_update_once
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg"
-  have "$cmd" || fail "installing $pkg did not provide $cmd"
+  log "$cmd missing - installing its host package"
+  install_package "$apt_package" "$dnf_package"
+  have "$cmd" || fail "package installation did not provide $cmd"
   log "$cmd: installed"
 }
 
@@ -76,8 +90,7 @@ ensure_certbot() {
       sudo ln -sf /snap/bin/certbot /usr/bin/certbot
     fi
   else
-    apt_update_once
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y certbot
+    install_package certbot certbot
   fi
 
   have certbot || fail "certbot installation did not put certbot on PATH"
@@ -91,6 +104,8 @@ require_docker() {
     fail "user $(id -un) cannot reach the Docker daemon - add it to the docker group and restart the runner"
   fi
   log "docker: ok"
+  docker compose version >/dev/null 2>&1 || fail "Docker Compose plugin is not installed"
+  log "docker compose: ok"
 }
 
 require_systemd() {
@@ -102,9 +117,11 @@ main() {
   require_passwordless_sudo
   require_docker
   require_systemd
-  ensure_apt_command envsubst gettext-base
-  ensure_apt_command openssl openssl
-  ensure_apt_command curl curl
+  ensure_command envsubst gettext-base gettext
+  ensure_command openssl openssl openssl
+  ensure_command curl curl curl
+  ensure_command python3 python3 python3
+  ensure_command flock util-linux util-linux
   ensure_certbot
   log "all prerequisites satisfied"
 }

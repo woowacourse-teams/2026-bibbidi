@@ -26,7 +26,7 @@ public class BibbidiToolCallingManager implements ToolCallingManager {
 
     private static final String QUESTION_ID = "next_tool";
     private static final String FINISH = "finish";
-    private static final Set<String> AUTO_READ_TOOLS = Set.of("getCatalog", "getMyChecklist");
+    private static final Set<String> AUTO_READ_TOOLS = Set.of("getCatalog", "getMyChecklist", "getMyWeddingDate");
     private static final int MAX_EXTRA_CALLS = 2;
     private static final int MAX_RESULT_CHARACTERS = 1200;
 

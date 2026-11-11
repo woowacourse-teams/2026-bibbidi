@@ -11,6 +11,7 @@ import com.bibbidi.wedding.chat.adapter.ai.tools.AppointmentServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.BibbidiToolCallingManager;
 import com.bibbidi.wedding.chat.adapter.ai.tools.CatalogServiceAdapter;
 import com.bibbidi.wedding.chat.adapter.ai.tools.ChecklistServiceAdapter;
+import com.bibbidi.wedding.chat.adapter.ai.tools.WeddingDateServiceAdapter;
 import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
 import io.micrometer.observation.ObservationRegistry;
 import java.util.Map;
@@ -85,11 +86,12 @@ public class AiChatConfig {
             SystemPrompt systemPrompt,
             CatalogServiceAdapter catalogTools,
             ChecklistServiceAdapter checklistTools,
-            AppointmentServiceAdapter appointmentTools
+            AppointmentServiceAdapter appointmentTools,
+            WeddingDateServiceAdapter weddingDateTools
     ) {
         return chatClientBuilder.defaultOptions(structuredAnswerOptions)
                 .defaultSystem(systemPrompt.text())
-                .defaultTools(catalogTools, checklistTools, appointmentTools)
+                .defaultTools(catalogTools, checklistTools, appointmentTools, weddingDateTools)
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
                 .build();
     }
@@ -116,13 +118,14 @@ public class AiChatConfig {
             SystemPrompt systemPrompt,
             CatalogServiceAdapter catalogTools,
             ChecklistServiceAdapter checklistTools,
-            AppointmentServiceAdapter appointmentTools
+            AppointmentServiceAdapter appointmentTools,
+            WeddingDateServiceAdapter weddingDateTools
     ) {
         BedrockProxyChatModel model = qwenChatModel(
                 accessKey, secretKey, region, maxTokens, properties, connection, observationRegistry);
         return ChatClient.builder(model)
                 .defaultSystem(systemPrompt.text())
-                .defaultTools(catalogTools, checklistTools, appointmentTools)
+                .defaultTools(catalogTools, checklistTools, appointmentTools, weddingDateTools)
                 .defaultAdvisors(
                         MessageChatMemoryAdvisor.builder(chatMemory).build(),
                         ToolCallingAdvisor.builder().toolCallingManager(toolCallingManager).build())
@@ -177,7 +180,8 @@ public class AiChatConfig {
             SystemPrompt systemPrompt,
             CatalogServiceAdapter catalogTools,
             ChecklistServiceAdapter checklistTools,
-            AppointmentServiceAdapter appointmentTools
+            AppointmentServiceAdapter appointmentTools,
+            WeddingDateServiceAdapter weddingDateTools
     ) {
         String schema = new BeanOutputConverter<>(ChatResult.Answer.class).getJsonSchema();
         OpenAiChatModel chatModel = OpenAiChatModel.builder()
@@ -192,7 +196,7 @@ public class AiChatConfig {
                 .build();
         return ChatClient.builder(chatModel)
                 .defaultSystem(systemPrompt.text())
-                .defaultTools(catalogTools, checklistTools, appointmentTools)
+                .defaultTools(catalogTools, checklistTools, appointmentTools, weddingDateTools)
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
                 .build();
     }

@@ -9,10 +9,8 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 import com.bibbidi.wedding.catalog.config.CatalogCacheConfig;
-import com.bibbidi.wedding.catalog.config.CatalogCacheProperties;
 import com.bibbidi.wedding.catalog.controller.CatalogController;
 import com.bibbidi.wedding.catalog.controller.dto.CatalogResponse;
 import com.bibbidi.wedding.catalog.domain.Catalog;
@@ -21,22 +19,11 @@ import com.bibbidi.wedding.catalog.domain.Item;
 import com.bibbidi.wedding.catalog.domain.Step;
 import com.bibbidi.wedding.catalog.repository.CatalogMapper;
 import com.bibbidi.wedding.catalog.repository.CatalogRepository;
-import com.bibbidi.wedding.terms.config.TermsCacheProperties;
-import com.bibbidi.wedding.terms.service.TermsResult;
-import com.bibbidi.wedding.terms.service.TermsService;
 import com.bibbidi.wedding.support.TestDatabaseLocks;
 import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Ticker;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManagerFactory;
-import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import javax.sql.DataSource;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -53,7 +40,6 @@ import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -61,14 +47,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:catalog-cache-test;IGNORECASE=TRUE",
-        "spring.jpa.properties.hibernate.generate_statistics=true",
-        "bibbidi.catalog.cache.ttl=1m",
-        "bibbidi.terms.cache.ttl=5m"
+        "spring.jpa.properties.hibernate.generate_statistics=true"
 })
 @ActiveProfiles("test")
-@Sql({"/fixtures/catalog-fixture.sql", "/fixtures/terms-fixture.sql"})
-@Sql(statements = {"DELETE FROM terms_agreements", "DELETE FROM terms", "DELETE FROM catalog_items",
-        "DELETE FROM steps", "DELETE FROM categories"},
+@Sql("/fixtures/catalog-fixture.sql")
+@Sql(statements = {"DELETE FROM catalog_items", "DELETE FROM steps", "DELETE FROM categories"},
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 @ResourceLock(TestDatabaseLocks.SPRING_TEST)
 class CatalogCacheIntegrationTest {
@@ -84,19 +67,6 @@ class CatalogCacheIntegrationTest {
     private CaffeineCacheManager catalogCacheManager;
 
     @Autowired
-    @Qualifier("termsCacheManager")
-    private CaffeineCacheManager termsCacheManager;
-
-    @Autowired
-    private TermsService termsService;
-
-    @Autowired
-    private TermsCacheProperties termsProperties;
-
-    @Autowired
-    private CatalogCacheProperties properties;
-
-    @Autowired
     private MeterRegistry registry;
 
     @Autowired
@@ -104,12 +74,6 @@ class CatalogCacheIntegrationTest {
 
     @Autowired
     private EntityManagerFactory entityManagerFactory;
-
-    @MockitoBean(name = "catalogCacheTicker")
-    private Ticker ticker;
-
-    @MockitoBean(name = "termsCacheTicker")
-    private Ticker termsTicker;
 
     @MockitoSpyBean
     private CatalogRepository catalogRepository;
@@ -123,18 +87,10 @@ class CatalogCacheIntegrationTest {
     @MockitoSpyBean
     private DataSource dataSource;
 
-    private final AtomicLong nanos = new AtomicLong();
-    private final AtomicLong termsNanos = new AtomicLong();
-
     @BeforeEach
     void resetCacheAndObservations() {
-        nanos.set(0);
-        termsNanos.set(0);
-        when(ticker.read()).thenAnswer(ignored -> nanos.get());
-        when(termsTicker.read()).thenAnswer(ignored -> termsNanos.get());
         cache().invalidateAll();
         cache().cleanUp();
-        termsCacheManager.getCache("terms").clear();
         statistics().clear();
         clearInvocations(catalogRepository, catalogMapper, transactionManager, dataSource);
     }
@@ -167,69 +123,20 @@ class CatalogCacheIntegrationTest {
     }
 
     @Test
-    @DisplayName("같은 인스턴스의 동시 첫 요청이 카탈로그를 한 번만 로드한다")
-    void shouldCoalesceConcurrentFirstRequests() throws Exception {
-        int callers = 8;
-        CountDownLatch ready = new CountDownLatch(callers);
-        CountDownLatch start = new CountDownLatch(1);
-        CountDownLatch requesting = new CountDownLatch(callers);
-        CountDownLatch loading = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
-        doAnswer(invocation -> {
-            loading.countDown();
-            assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
-            return invocation.callRealMethod();
-        }).when(catalogRepository).findCatalog();
-
-        try (var executor = Executors.newFixedThreadPool(callers)) {
-            List<Future<Catalog>> results = new ArrayList<>();
-            for (int i = 0; i < callers; i++) {
-                results.add(executor.submit(() -> {
-                    ready.countDown();
-                    assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
-                    requesting.countDown();
-                    return catalogService.find();
-                }));
-            }
-            try {
-                assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
-                start.countDown();
-                assertThat(requesting.await(10, TimeUnit.SECONDS)).isTrue();
-                assertThat(loading.await(10, TimeUnit.SECONDS)).isTrue();
-            } finally {
-                start.countDown();
-                release.countDown();
-            }
-            Catalog first = results.getFirst().get(10, TimeUnit.SECONDS);
-            for (Future<Catalog> result : results) {
-                assertThat(result.get(10, TimeUnit.SECONDS)).isSameAs(first);
-            }
-        }
-
-        verify(catalogRepository).findCatalog();
-        verify(catalogMapper).toDomain(any(), any(), any());
-        assertThat(statistics().getTransactionCount()).isEqualTo(1);
-        verify(dataSource).getConnection();
-        assertThat(statistics().getPrepareStatementCount()).isEqualTo(3);
-    }
-
-    @Test
-    @DisplayName("적중해도 쓰기 기준 만료 시각은 연장되지 않고 만료 후 변경 데이터를 읽는다")
-    void shouldReloadChangedDataAfterWriteExpiry() {
-        assertThat(properties.ttl()).isEqualTo(Duration.ofMinutes(1));
+    @DisplayName("시간이 지나도 저장한 값을 유지하고 캐시가 비면 변경 데이터를 읽는다")
+    void shouldKeepValueUntilCacheIsCleared() {
         Catalog first = catalogService.find();
         jdbcTemplate.update("UPDATE categories SET name = '변경된 웨딩홀' WHERE id = 2");
-        nanos.set(properties.ttl().minusNanos(1).toNanos());
 
         assertThat(catalogService.find()).isSameAs(first);
-        assertThat(first.categories().getFirst().name()).isEqualTo("웨딩홀");
-        nanos.incrementAndGet();
-        Catalog refreshed = catalogService.find();
+        assertThat(cache().policy().expireAfterWrite()).isEmpty();
+        assertThat(cache().policy().expireAfterAccess()).isEmpty();
 
-        assertThat(refreshed).isNotSameAs(first);
-        assertThat(refreshed.categories().getFirst().name()).isEqualTo("변경된 웨딩홀");
+        cache().invalidateAll();
+
+        Catalog reloaded = catalogService.find();
+        assertThat(reloaded.categories().getFirst().name()).isEqualTo("변경된 웨딩홀");
         verify(catalogRepository, times(2)).findCatalog();
-        verify(catalogMapper, times(2)).toDomain(any(), any(), any());
     }
 
     @Test
@@ -302,42 +209,13 @@ class CatalogCacheIntegrationTest {
     void shouldExposeHitAndMissMetrics() {
         double hits = requests("catalog", "hit");
         double misses = requests("catalog", "miss");
-        double termsHits = requests("terms", "hit");
-        double termsMisses = requests("terms", "miss");
 
         catalogService.find();
         catalogService.find();
         catalogService.find();
-        termsService.findAll();
-        termsService.findAll();
 
         assertThat(requests("catalog", "miss") - misses).isEqualTo(1);
         assertThat(requests("catalog", "hit") - hits).isEqualTo(2);
-        assertThat(requests("terms", "miss") - termsMisses).isEqualTo(1);
-        assertThat(requests("terms", "hit") - termsHits).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("같은 키를 사용해도 카탈로그와 약관은 각 TTL에 따라 독립적으로 갱신된다")
-    void shouldRefreshCatalogAndTermsIndependently() {
-        Catalog catalog = catalogService.find();
-        List<TermsResult> terms = termsService.findAll();
-        jdbcTemplate.update("UPDATE categories SET name = '변경된 웨딩홀' WHERE id = 2");
-        jdbcTemplate.update("UPDATE terms SET title = '변경된 서비스 이용약관' WHERE id = 1");
-        nanos.set(properties.ttl().toNanos());
-        termsNanos.set(properties.ttl().toNanos());
-
-        Catalog refreshedCatalog = catalogService.find();
-        assertThat(refreshedCatalog).isNotSameAs(catalog);
-        assertThat(refreshedCatalog.categories().getFirst().name()).isEqualTo("변경된 웨딩홀");
-        assertThat(termsService.findAll()).isSameAs(terms);
-        assertThat(terms).extracting(TermsResult::title).contains("서비스 이용약관");
-
-        termsNanos.set(termsProperties.ttl().toNanos());
-        List<TermsResult> refreshedTerms = termsService.findAll();
-        assertThat(refreshedTerms).isNotSameAs(terms);
-        assertThat(refreshedTerms).extracting(TermsResult::title).contains("변경된 서비스 이용약관");
-        assertThat(catalogService.find()).isSameAs(refreshedCatalog);
     }
 
     private Cache<Object, Object> cache() {

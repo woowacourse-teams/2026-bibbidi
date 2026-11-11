@@ -7,6 +7,7 @@ on:
       - Android Release AAB
       - 비비디 백엔드 개발 CD
       - 비비디 백엔드 운영 CD
+      - 비비디 백엔드 운영 롤백·정리
       - 비비디 백엔드 CI
       - Frontend CI
       - 비비디 k6 태그 정리

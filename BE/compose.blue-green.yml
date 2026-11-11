@@ -1,0 +1,41 @@
+# Merge with compose.prod.yml for the Blue/Green deployment.
+# Set BIBBIDI_BASE_COMPOSE_FILE=compose.yaml for the installed server base file.
+# IMAGE_TAG is still required by the base file's legacy backend definition.
+# Nginx routing and Alloy targets are configured separately before deployment.
+services:
+  backend:
+    profiles:
+      - legacy
+
+  backend-blue:
+    extends:
+      file: ${BIBBIDI_BASE_COMPOSE_FILE:-compose.prod.yml}
+      service: backend
+    profiles: !override
+      - blue
+    image: "${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME is required}/bibbidi-backend:${BLUE_IMAGE_TAG:?BLUE_IMAGE_TAG is required}"
+    container_name: bibbidi-backend-blue
+    ports: !override
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8081:8081"
+    environment:
+      OTEL_SERVICE_INSTANCE_ID: ${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod}-blue
+      OTEL_RESOURCE_ATTRIBUTES: service.name=${OTEL_SERVICE_NAME:-bibbidi-backend},service.version=${OTEL_SERVICE_VERSION:-1.0.0},service.instance.id=${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod}-blue,deployment.environment.name=${DEPLOYMENT_ENVIRONMENT_NAME:-production}
+
+  backend-green:
+    extends:
+      file: ${BIBBIDI_BASE_COMPOSE_FILE:-compose.prod.yml}
+      service: backend
+    profiles: !override
+      - green
+    image: "${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME is required}/bibbidi-backend:${GREEN_IMAGE_TAG:?GREEN_IMAGE_TAG is required}"
+    container_name: bibbidi-backend-green
+    ports: !override
+      - "127.0.0.1:8082:8080"
+      - "127.0.0.1:8083:8081"
+    environment:
+      OTEL_SERVICE_INSTANCE_ID: ${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod}-green
+      OTEL_RESOURCE_ATTRIBUTES: service.name=${OTEL_SERVICE_NAME:-bibbidi-backend},service.version=${OTEL_SERVICE_VERSION:-1.0.0},service.instance.id=${OTEL_SERVICE_INSTANCE_ID:-bibbidi-backend-prod}-green,deployment.environment.name=${DEPLOYMENT_ENVIRONMENT_NAME:-production}
+
+  nginx:
+    depends_on: !reset []

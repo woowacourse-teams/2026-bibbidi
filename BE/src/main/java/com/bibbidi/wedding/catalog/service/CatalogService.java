@@ -46,7 +46,7 @@ public class CatalogService {
         catalogRepository.validateCategoryExists(categoryId);
     }
 
-    @Cacheable(cacheNames = CatalogCacheConfig.CATALOG_CACHE, cacheManager = "catalogCacheManager", key = "'all'", sync = true)
+    @Cacheable(cacheNames = CatalogCacheConfig.CATALOG_CACHE)
     @Transactional(readOnly = true)
     public Catalog find() {
         return catalogRepository.findCatalog();

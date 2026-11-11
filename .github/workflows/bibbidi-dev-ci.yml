@@ -23,6 +23,8 @@ jobs:
         steps:
             - name: 테스트 소스 코드 체크아웃
               uses: actions/checkout@v7
+              with:
+                  fetch-depth: 0
 
             - name: Corretto JDK 버전 25 설정
               uses: actions/setup-java@v6
@@ -35,6 +37,12 @@ jobs:
 
             - name: Gradle check로 테스트와 JaCoCo 커버리지 검증 실행, JAR 빌드
               run: ./gradlew check bootJar
+
+            - name: 변경된 백엔드 클래스의 PIT mutation 점수 검증
+              if: github.event_name == 'pull_request'
+              env:
+                  PITEST_BASE_REF: ${{ github.event.pull_request.base.sha }}
+              run: ./gradlew pitest -PpitestChanged=true -PpitestBaseRef="$PITEST_BASE_REF"
 
             - name: Node.js 버전을 24.19.0으로 설정
               if: github.event_name == 'pull_request'
@@ -57,7 +65,7 @@ jobs:
                   retention-days: 14
                   if-no-files-found: error
 
-            - name: 테스트 실패 시 테스트와 JaCoCo 보고서 기록
+            - name: 테스트 실패 시 테스트와 JaCoCo 및 PIT 보고서 기록
               if: failure()
               uses: actions/upload-artifact@v7
               with:
@@ -65,4 +73,5 @@ jobs:
                   path: |
                       BE/build/reports/tests/test
                       BE/build/reports/jacoco/test/html
+                      BE/build/reports/pitest
                   retention-days: 7
