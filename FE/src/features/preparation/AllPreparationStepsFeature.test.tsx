@@ -10,7 +10,8 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthState } from "../auth/model/auth";
-import type { ChecklistQueryModel } from "../checklist/model/checklistQuery";
+import type { CatalogModel } from "../catalog";
+import type { MyChecklistModel } from "../checklist/model/myChecklist";
 import { installMatchMedia } from "../../test/matchMedia";
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
 
@@ -22,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   add: vi.fn(),
   getChecklist: vi.fn(),
   revision: 0,
+  listeners: new Set<() => void>(),
   track: vi.fn(),
 }));
 vi.mock("../auth", () => ({
@@ -37,14 +39,25 @@ vi.mock("./preparationDependencies", () => {
   };
   return {
     usePreparationChecklistRepository: () => repository,
-    preparationCatalogRepository: { getCatalog: mocks.catalog },
   };
 });
-vi.mock("../checklist/checklistQueryDependencies", () => {
+vi.mock("../catalog", () => ({
+  catalogRepository: { getCatalog: mocks.catalog },
+}));
+vi.mock("../checklist", async (importOriginal) => {
   const repository = { getChecklist: mocks.getChecklist };
+  const { useSyncExternalStore } = await import("react");
+  const subscribe = (listener: () => void) => {
+    mocks.listeners.add(listener);
+    return () => {
+      mocks.listeners.delete(listener);
+    };
+  };
   return {
-    useChecklistQueryRepository: () => repository,
-    useChecklistRevision: () => mocks.revision,
+    ...(await importOriginal<typeof import("../checklist")>()),
+    useMyChecklistQueryRepository: () => repository,
+    useMyChecklistRevision: () =>
+      useSyncExternalStore(subscribe, () => mocks.revision),
   };
 });
 import { AllPreparationStepsFeature } from "./AllPreparationStepsFeature";
@@ -53,25 +66,28 @@ import {
   PreparationAuthenticationRequiredError,
   PreparationChecklistAdditionError,
 } from "./repository/preparationErrors";
-import { ChecklistQueryAuthenticationRequiredError } from "../checklist/repository/checklistQueryRepository";
+import { MyChecklistAuthenticationRequiredError } from "../checklist/repository/myChecklistQueryRepository";
 
-let saved: ChecklistQueryModel;
+let saved: MyChecklistModel;
 let ids: string[];
 function savedItem(id: number, status: "prev" | "done" = "prev") {
   return {
-    id: `checklist-item-${id}`,
-    checklistItemId: id,
+    id,
+    createdAt: null,
     sourceCatalogItemId: id,
-    categoryId: "wedding-hall",
+    categoryId: 10,
     title: id === 101 ? "내 웨딩홀 투어" : "내 웨딩홀 견적 비교",
     status,
     appointments: [],
   };
 }
-function ui(categoryId?: string) {
+function ui(categoryId?: string, initialCatalog?: CatalogModel) {
   return (
     <MemoryRouter>
-      <AllPreparationStepsFeature initialCategoryId={categoryId} />
+      <AllPreparationStepsFeature
+        initialCategoryId={categoryId}
+        initialCatalog={initialCatalog}
+      />
     </MemoryRouter>
   );
 }
@@ -94,9 +110,8 @@ beforeEach(() => {
   mocks.revision = 0;
   ids = ["101"];
   saved = {
-    categories: [
-      { id: "wedding-hall", title: "웨딩홀", items: [savedItem(101, "done")] },
-    ],
+    exists: true,
+    items: [savedItem(101, "done")],
   };
   mocks.catalog.mockReset().mockResolvedValue(preparationCatalogFixture);
   mocks.getIds.mockReset().mockImplementation(async () => [...ids]);
@@ -108,18 +123,11 @@ beforeEach(() => {
       ids.push(...added);
       if (audience === "authenticated") {
         saved = {
-          categories: [
-            {
-              id: "wedding-hall",
-              title: "웨딩홀",
-              items: [
-                ...saved.categories[0].items,
-                ...added.map((id) => savedItem(Number(id))),
-              ],
-            },
-          ],
+          exists: true,
+          items: [...saved.items, ...added.map((id) => savedItem(Number(id)))],
         };
         mocks.revision += 1;
+        for (const listener of mocks.listeners) listener();
       }
       return added;
     });
@@ -170,6 +178,28 @@ describe("단일 준비 로드맵", () => {
     expect(screen.getByRole("heading", { name: "웨딩홀" })).toBeTruthy();
     expect(mocks.catalog).toHaveBeenCalledOnce();
   });
+  it("주입된 카탈로그는 인증 대기 중에도 사용하고 공개 API를 조회하지 않는다", async () => {
+    mocks.auth = { status: "loading" };
+    render(ui("studio-dress-makeup", preparationCatalogFixture));
+    expect(screen.getByRole("heading", { name: "스드메" })).toBeTruthy();
+    expect(mocks.catalog).not.toHaveBeenCalled();
+    expect(mocks.getChecklist).not.toHaveBeenCalled();
+    expect(mocks.getIds).not.toHaveBeenCalled();
+  });
+
+  it("인증 대기 중 상세는 공개 할 일만 표시하고 개인 조작을 제공하지 않는다", async () => {
+    mocks.auth = { status: "loading" };
+    const { container } = await show();
+    expect(
+      container.querySelector("[data-personal-preparation-state='unknown']"),
+    ).toBeTruthy();
+    const dialog = await openFirst();
+    expect(within(dialog).getByText("웨딩홀 투어")).toBeTruthy();
+    expect(within(dialog).queryByText(/담은 일/)).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: /추가/ })).toBeNull();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
   it("존재하지 않는 카테고리는 첫 단계가 있는 카테고리로 돌아간다", async () => {
     await show("unknown");
     expect(screen.getByRole("heading", { name: "웨딩홀" })).toBeTruthy();
@@ -301,19 +331,20 @@ describe("단일 준비 로드맵", () => {
       status: "authenticated",
       user: { id: 1, nickname: "비비디" },
     };
-    let resolveChecklist!: (checklist: ChecklistQueryModel) => void;
+    let resolveChecklist!: (checklist: MyChecklistModel) => void;
     mocks.getChecklist.mockReturnValueOnce(
-      new Promise<ChecklistQueryModel>((resolve) => {
+      new Promise<MyChecklistModel>((resolve) => {
         resolveChecklist = resolve;
       }),
     );
     const { container } = await show();
     const roadmap = container.querySelector(
-      "[data-page-content-state='success']",
+      "[data-personal-preparation-state]",
     );
     expect(roadmap?.getAttribute("data-personal-preparation-state")).toBe(
       "loading",
     );
+    expect(roadmap?.getAttribute("data-page-content-state")).toBe("loading");
     expect(screen.queryByRole("progressbar")).toBeNull();
 
     resolveChecklist(saved);
@@ -323,6 +354,7 @@ describe("단일 준비 로드맵", () => {
     expect(roadmap?.getAttribute("data-personal-preparation-state")).toBe(
       "ready",
     );
+    expect(roadmap?.getAttribute("data-page-content-state")).toBe("success");
     expect(progress.getAttribute("aria-valuenow")).toBe("100");
     expect(progress.getAttribute("aria-valuetext")).toBe("1개 중 1개 완료");
     expect(screen.getByText("내 할 일 완료")).toBeTruthy();
@@ -340,12 +372,60 @@ describe("단일 준비 로드맵", () => {
     };
     const { rerender } = await show();
     await screen.findByText("내 할 일 완료");
-    saved = { categories: [] };
+    saved = { exists: true, items: [] };
     mocks.revision += 1;
     rerender(ui());
     await waitFor(() => expect(screen.queryByRole("progressbar")).toBeNull());
     expect(screen.getAllByText("준비 전")).toHaveLength(3);
   });
+  it("완료 상태 변경을 같은 공개 목록에 반영한다", async () => {
+    mocks.auth = {
+      status: "authenticated",
+      user: { id: 1, nickname: "비비디" },
+    };
+    const { rerender } = await show();
+    await screen.findByText("내 할 일 완료");
+    const list = screen.getByRole("list", { name: "준비 단계" });
+    saved = { exists: true, items: [savedItem(101)] };
+    mocks.revision += 1;
+    rerender(ui());
+    await screen.findByText("진행 중");
+    expect(screen.getByRole("list", { name: "준비 단계" })).toBe(list);
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe(
+      "0",
+    );
+    expect(mocks.catalog).toHaveBeenCalledOnce();
+  });
+
+  it("계정 전환과 로그아웃 뒤에 늦게 온 이전 개인 응답을 버린다", async () => {
+    mocks.auth = { status: "authenticated", user: { id: 1, nickname: "A" } };
+    let resolveOld!: (value: MyChecklistModel) => void;
+    let oldSignal!: AbortSignal;
+    mocks.getChecklist.mockImplementationOnce((signal) => {
+      oldSignal = signal;
+      return new Promise<MyChecklistModel>((resolve) => {
+        resolveOld = resolve;
+      });
+    });
+    const { rerender } = await show();
+    const list = screen.getByRole("list", { name: "준비 단계" });
+    saved = { exists: true, items: [savedItem(102)] };
+    mocks.auth = { status: "authenticated", user: { id: 2, nickname: "B" } };
+    rerender(ui());
+    await screen.findByText("내 웨딩홀 견적 비교");
+    expect(oldSignal.aborted).toBe(true);
+    await act(async () =>
+      resolveOld({ exists: true, items: [savedItem(101, "done")] }),
+    );
+    expect(screen.queryByText("내 웨딩홀 투어")).toBeNull();
+    mocks.auth = { status: "guest" };
+    rerender(ui());
+    await screen.findByText("준비 중");
+    expect(screen.queryByText("내 웨딩홀 견적 비교")).toBeNull();
+    expect(screen.getByRole("list", { name: "준비 단계" })).toBe(list);
+    expect(mocks.catalog).toHaveBeenCalledOnce();
+  });
+
   it("내 현황 조회 실패에도 단계 탐색을 유지하고 다시 불러온다", async () => {
     mocks.auth = {
       status: "authenticated",
@@ -364,7 +444,7 @@ describe("단일 준비 로드맵", () => {
       user: { id: 1, nickname: "비비디" },
     };
     mocks.getChecklist.mockRejectedValue(
-      new ChecklistQueryAuthenticationRequiredError(),
+      new MyChecklistAuthenticationRequiredError(),
     );
     await show();
     await waitFor(() => expect(mocks.refreshAuth).toHaveBeenCalled());
@@ -548,7 +628,7 @@ describe("단일 준비 로드맵", () => {
     await openFirst();
     fireEvent.click(within(modal()).getByRole("button", { name: "모두 추가" }));
     mocks.auth = { status: "authenticated", user: { id: 2, nickname: "B" } };
-    saved = { categories: [] };
+    saved = { exists: true, items: [] };
     ids = [];
     rerender(ui());
     expect(signal.aborted).toBe(true);
