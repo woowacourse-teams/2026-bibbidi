@@ -1,12 +1,10 @@
-import type { PreparationCatalogModel } from "./preparationRoadmap";
+import type { CatalogModel } from "../../catalog";
 
 export interface PreparationRoadmapSelection {
   categoryId: string;
   stepId: string;
 }
-export function getAvailablePreparationCategories(
-  model: PreparationCatalogModel,
-) {
+export function getAvailablePreparationCategories(model: CatalogModel) {
   return model.categories.filter((category) =>
     model.roadmaps.some(
       (roadmap) =>
@@ -14,18 +12,16 @@ export function getAvailablePreparationCategories(
     ),
   );
 }
-export function hasSelectablePreparationSteps(model: PreparationCatalogModel) {
+export function hasSelectablePreparationSteps(model: CatalogModel) {
   return getAvailablePreparationCategories(model).length > 0;
 }
-export function getInitialSelectedCategoryId(
-  model: PreparationCatalogModel,
-): string {
+export function getInitialSelectedCategoryId(model: CatalogModel): string {
   const category = getAvailablePreparationCategories(model)[0];
   if (!category) throw new Error("선택할 준비 카테고리가 없습니다.");
   return category.id;
 }
 export function getInitialSelectedStepId(
-  model: PreparationCatalogModel,
+  model: CatalogModel,
   categoryId: string,
 ): string {
   const steps =
@@ -36,13 +32,13 @@ export function getInitialSelectedStepId(
   return first.id;
 }
 export function createInitialPreparationRoadmapSelection(
-  model: PreparationCatalogModel,
+  model: CatalogModel,
 ): PreparationRoadmapSelection {
   const categoryId = getInitialSelectedCategoryId(model);
   return { categoryId, stepId: getInitialSelectedStepId(model, categoryId) };
 }
 export function selectPreparationCategory(
-  model: PreparationCatalogModel,
+  model: CatalogModel,
   selection: PreparationRoadmapSelection,
   categoryId: string,
 ): PreparationRoadmapSelection {

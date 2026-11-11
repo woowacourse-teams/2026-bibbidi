@@ -85,17 +85,19 @@ export function ServiceLayout({
         </div>
       }
     >
-      <AiChatSessionProvider
-        key={aiAudience}
-        feedbackAudienceKey={aiAudience}
-        isAuthenticated={authState.status === "authenticated"}
-        onAuthenticationRequired={refreshAuth}
-        onKeyboardVisibilityChange={setAiKeyboardVisible}
-      >
-        <div className="service-layout__content">
-          <Outlet />
-        </div>
-      </AiChatSessionProvider>
+      <div className="service-layout__content">
+        {/* Reset the chat session per account without remounting the public roadmap. */}
+        <AiChatSessionProvider
+          key={aiAudience}
+          feedbackAudienceKey={aiAudience}
+          isAuthenticated={authState.status === "authenticated"}
+          onAuthenticationRequired={refreshAuth}
+          onKeyboardVisibilityChange={setAiKeyboardVisible}
+        >
+          {isAiChat && <Outlet />}
+        </AiChatSessionProvider>
+        {!isAiChat && <Outlet />}
+      </div>
 
       {showNavigationDock && (
         <div className="service-layout__mobile-dock">

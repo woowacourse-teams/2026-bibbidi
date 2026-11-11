@@ -253,6 +253,12 @@ describe("appRoutes", () => {
             );
           }
 
+          if (url === "/api/catalog") {
+            return Promise.resolve(
+              new Response(JSON.stringify(preparationCatalogResponseFixture)),
+            );
+          }
+
           if (url === "/api/terms") {
             return Promise.resolve(
               new Response(
@@ -284,10 +290,17 @@ describe("appRoutes", () => {
         await screen.findByRole("heading", { name: "가입 마무리" }),
       ).toBeTruthy();
       expect(router.state.location.pathname).toBe(path);
-      // The complete app tree is mounted: only session refresh and public terms may load.
+      const allowedRequests = ["/api/auth/web/sessions/refresh", "/api/terms"];
+      if (path === "/preparation") {
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/catalog",
+          expect.objectContaining({ credentials: "omit" }),
+        );
+        allowedRequests.push("/api/catalog");
+      }
       expect(
         new Set(fetchMock.mock.calls.map(([input]) => input.toString())),
-      ).toEqual(new Set(["/api/auth/web/sessions/refresh", "/api/terms"]));
+      ).toEqual(new Set(allowedRequests));
 
       fireEvent.click(
         screen.getByRole("button", { name: "다른 계정으로 로그인" }),
@@ -421,6 +434,9 @@ describe("appRoutes", () => {
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/");
+    expect(
+      await screen.findByText(/단계 · 내 할 일 0개 · 완료 0개/),
+    ).toBeTruthy();
     expect(
       fetchMock.mock.calls
         .map(([input]) => input.toString())

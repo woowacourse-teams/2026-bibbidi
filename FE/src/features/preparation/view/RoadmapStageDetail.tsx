@@ -56,7 +56,7 @@ export function RoadmapStageDetail({
     )?.focus();
   }, [pending, stage.tasks]);
   const title = `${stage.numberLabel} ${stage.title}`;
-  const remaining = stage.tasks.filter((task) => !task.isIncluded);
+  const remaining = stage.tasks.filter((task) => task.isIncluded === false);
   const content = (
     <div className="roadmap-stage-detail" ref={contentRef}>
       {stage.description && (
@@ -68,7 +68,9 @@ export function RoadmapStageDetail({
         horizontalPadding="none"
         description={
           <span aria-live="polite">
-            전체 {stage.tasks.length}개 · 담은 일 {stage.includedCount}개
+            전체 {stage.tasks.length}개
+            {stage.includedCount !== undefined &&
+              ` · 담은 일 ${stage.includedCount}개`}
           </span>
         }
         right={
@@ -109,7 +111,7 @@ export function RoadmapStageDetail({
                 />
               }
               right={
-                task.isIncluded ? (
+                task.isIncluded === undefined ? undefined : task.isIncluded ? (
                   <Badge color={task.isComplete ? "positive" : "dark"}>
                     {!isGuest && task.isComplete ? "완료" : "담은 일"}
                   </Badge>

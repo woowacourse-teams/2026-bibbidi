@@ -40,14 +40,17 @@ vi.mock("./preparationDependencies", () => {
   };
   return {
     usePreparationChecklistRepository: () => repository,
-    preparationCatalogRepository: { getCatalog: mocks.catalog },
   };
 });
-vi.mock("../checklist/checklistQueryDependencies", () => {
+vi.mock("../catalog", () => ({
+  catalogRepository: { getCatalog: mocks.catalog },
+}));
+vi.mock("../checklist", async (importOriginal) => {
   const repository = { getChecklist: mocks.query };
   return {
-    useChecklistQueryRepository: () => repository,
-    useChecklistRevision: () => 0,
+    ...(await importOriginal<typeof import("../checklist")>()),
+    useMyChecklistQueryRepository: () => repository,
+    useMyChecklistRevision: () => 0,
   };
 });
 import { PreparationRoadmapFeature } from "./PreparationRoadmapFeature";
@@ -86,7 +89,7 @@ beforeEach(() => {
   mocks.auth = { status: "authenticated", user: { id: 1, nickname: "비비디" } };
   mocks.catalog.mockResolvedValue(preparationCatalogFixture);
   mocks.ids.mockResolvedValue([]);
-  mocks.query.mockResolvedValue({ categories: [] });
+  mocks.query.mockResolvedValue({ exists: true, items: [] });
   mocks.add.mockResolvedValue([]);
 });
 afterEach(() => {
@@ -190,23 +193,19 @@ describe("통합 로드맵 작업 공간", () => {
       ),
     ).toBe(true);
   });
-  it("인증 조회 중에는 이전 로드맵이나 AI를 노출하지 않는다", async () => {
+  it("인증 조회 중에도 공개 로드맵을 표시한다", async () => {
     mocks.auth = { status: "loading" };
-    const { rerender } = workspace();
-    expect(screen.queryByRole("list", { name: "준비 단계" })).toBeNull();
-    expect(screen.queryByLabelText("AI 채팅")).toBeNull();
-    mocks.auth = { status: "guest" };
-    rerender(
-      <MemoryRouter>
-        <PreparationRoadmapFeature />
-      </MemoryRouter>,
-    );
-    await screen.findByRole("heading", { name: "웨딩홀" });
+    workspace();
+    expect(await screen.findByRole("list", { name: "준비 단계" })).toBeTruthy();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(mocks.query).not.toHaveBeenCalled();
   });
-  it("오류 상태의 다시 시도는 인증 갱신에 연결한다", () => {
+  it("인증 실패에도 공개 로드맵을 표시하고 현황 재시도로 인증을 갱신한다", async () => {
     mocks.auth = { status: "error" };
     workspace();
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByRole("list", { name: "준비 단계" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "현황 다시 불러오기" }));
     expect(mocks.refresh).toHaveBeenCalledOnce();
+    expect(mocks.catalog).toHaveBeenCalledOnce();
   });
 });
