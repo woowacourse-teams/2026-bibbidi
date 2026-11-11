@@ -83,3 +83,15 @@ datasources:
     jsonData:
       authType: default
       defaultRegion: ap-northeast-2
+
+  - name: MySQL
+    uid: mysql
+    type: mysql
+    access: proxy
+    url: $GRAFANA_MYSQL_URL
+    user: $GRAFANA_MYSQL_USER
+    editable: false
+    jsonData:
+      database: bibbidi
+    secureJsonData:
+      password: $GRAFANA_MYSQL_PASSWORD

@@ -58,8 +58,10 @@ public class TermsService {
             throw new BusinessException(ClientError.INVALID_REQUEST,
                     "존재하지 않는 약관 버전입니다. version=" + termsVersion);
         }
+        Set<Long> alreadyAgreedIds = Set.copyOf(findAgreedTermsIds(userId));
         LocalDateTime agreedAt = LocalDateTime.now();
         termsRepository.saveAll(agreedTerms.stream()
+                .filter(terms -> !alreadyAgreedIds.contains(terms.id()))
                 .map(terms -> TermsAgreement.of(userId, terms.id(), agreedAt))
                 .toList());
     }

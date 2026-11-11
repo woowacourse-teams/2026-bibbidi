@@ -236,6 +236,36 @@ class ChecklistServiceTest {
     }
 
     @Test
+    @DisplayName("랜덤으로 선택한 할 일의 카테고리 이름만 중복 없이 조회한다")
+    void shouldFindCategoryNamesOnlyForPickedItems() {
+        // given
+        ChecklistItem unpickedItem = new ChecklistItem(
+                200L, 3L, "선택되지 않은 할 일", null, ChecklistItemStatus.PREV, null);
+        ChecklistItem catalogItem = constructTestItem(201L, ChecklistItemStatus.PREV, CONTRACT_ITEM_ID);
+        ChecklistItem honeymoonItem = new ChecklistItem(
+                202L, 4L, "여행지 정하기", null, ChecklistItemStatus.CONTINUE, null);
+        ChecklistItem customItem = constructTestItem(203L);
+        List<ChecklistItem> candidates = List.of(unpickedItem, catalogItem, honeymoonItem, customItem);
+        given(checklistRepository.getByOwnerId(OWNER_ID))
+                .willReturn(new Checklist(CHECKLIST_ID, OWNER_ID, candidates));
+        given(shuffler.shuffle(candidates)).willReturn(candidates.reversed());
+        given(catalogService.findCategoryNames(Set.of(CATEGORY_ID, 4L)))
+                .willReturn(new CategoryNames(Map.of(CATEGORY_ID, "웨딩홀", 4L, "신혼여행")));
+
+        // when
+        List<UnscheduledChecklistItemResult> results = checklistService.findUnscheduledItems(OWNER_ID, 3);
+
+        // then
+        assertThat(results).containsExactly(
+                new UnscheduledChecklistItemResult(203L, "계약서 확인", "웨딩홀", ChecklistItemStatus.PREV),
+                new UnscheduledChecklistItemResult(202L, "여행지 정하기", "신혼여행", ChecklistItemStatus.CONTINUE),
+                new UnscheduledChecklistItemResult(201L, "계약서 확인", "웨딩홀", ChecklistItemStatus.PREV)
+        );
+        then(catalogService).should().findCategoryNames(Set.of(CATEGORY_ID, 4L));
+        then(catalogService).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
     @DisplayName("일정이 필요한 할 일이 없으면 빈 목록을 돌려준다")
     void shouldReturnEmptyWhenNoItemNeedsSchedule() {
         // given
@@ -252,78 +282,6 @@ class ChecklistServiceTest {
 
         // then
         assertThat(results).isEmpty();
-    }
-
-    @Test
-    @DisplayName("모델이 선택한 추천에서 없는 항목과 등록된 항목 및 중복을 제외하고 순서를 유지한다")
-    void shouldFilterSelectedRecommendationsWhilePreservingOrder() {
-        // given
-        List<Long> requested = List.of(3L, 2L, 999L, 1L, 3L);
-        given(catalogService.findItems(requested)).willReturn(List.of(
-                new CatalogItemSnapshot(1L, 10L, "웨딩홀"),
-                new CatalogItemSnapshot(2L, 20L, "스튜디오"),
-                new CatalogItemSnapshot(3L, 30L, "드레스")));
-        given(checklistRepository.getByOwnerId(OWNER_ID)).willReturn(new Checklist(
-                CHECKLIST_ID,
-                OWNER_ID,
-                List.of(constructTestItem(200L, ChecklistItemStatus.DONE, 2L), constructTestItem(201L))
-        ));
-
-        // when
-        List<Long> result = checklistService.filterRecommendableCatalogItemIds(OWNER_ID, requested);
-
-        // then
-        assertThat(result).containsExactly(3L, 1L);
-        then(checklistRepository).should().getByOwnerId(OWNER_ID);
-        then(checklistAppointmentService).shouldHaveNoInteractions();
-        then(shuffler).shouldHaveNoInteractions();
-    }
-
-    @Test
-    @DisplayName("체크리스트가 없는 사용자는 모델이 선택한 실제 카탈로그 항목을 추천받을 수 있다")
-    void shouldAllowSelectedRecommendationsWhenChecklistIsMissing() {
-        // given
-        given(catalogService.findItems(List.of(1L))).willReturn(List.of(new CatalogItemSnapshot(1L, 10L, "웨딩홀")));
-        given(checklistRepository.getByOwnerId(OWNER_ID))
-                .willThrow(new BusinessException(ClientError.CHECKLIST_NOT_FOUND, "없음"));
-
-        // when, then
-        assertThat(checklistService.filterRecommendableCatalogItemIds(OWNER_ID, List.of(1L))).containsExactly(1L);
-    }
-
-    @Test
-    @DisplayName("모델이 선택한 추천 목록이 비어 있으면 조회하지 않는다")
-    void shouldNotQueryForEmptySelectedRecommendations() {
-        // when, then
-        assertThat(checklistService.filterRecommendableCatalogItemIds(OWNER_ID, List.of())).isEmpty();
-        then(catalogService).shouldHaveNoInteractions();
-        then(checklistRepository).shouldHaveNoInteractions();
-    }
-
-    @Test
-    @DisplayName("추천 검증 중 카탈로그 조회 실패를 빈 추천으로 취급하지 않는다")
-    void shouldPropagateCatalogFailureWhenFilteringRecommendations() {
-        // given
-        BusinessException failure = new BusinessException(ClientError.INTERNAL_ERROR, "카탈로그 조회 장애");
-        given(catalogService.findItems(List.of(1L))).willThrow(failure);
-
-        // when, then
-        assertThatThrownBy(() -> checklistService.filterRecommendableCatalogItemIds(OWNER_ID, List.of(1L)))
-                .isSameAs(failure);
-        then(checklistRepository).shouldHaveNoInteractions();
-    }
-
-    @Test
-    @DisplayName("추천 검증 중 체크리스트 조회 실패를 체크리스트가 없는 상태로 취급하지 않는다")
-    void shouldPropagateChecklistFailureWhenFilteringRecommendations() {
-        // given
-        given(catalogService.findItems(List.of(1L))).willReturn(List.of(new CatalogItemSnapshot(1L, 10L, "웨딩홀")));
-        BusinessException failure = new BusinessException(ClientError.INTERNAL_ERROR, "체크리스트 조회 장애");
-        given(checklistRepository.getByOwnerId(OWNER_ID)).willThrow(failure);
-
-        // when, then
-        assertThatThrownBy(() -> checklistService.filterRecommendableCatalogItemIds(OWNER_ID, List.of(1L)))
-                .isSameAs(failure);
     }
 
     @Test

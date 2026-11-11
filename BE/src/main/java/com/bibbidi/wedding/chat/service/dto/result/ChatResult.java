@@ -1,0 +1,32 @@
+package com.bibbidi.wedding.chat.service.dto.result;
+
+import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
+import com.bibbidi.wedding.chat.service.turn.CancelReason;
+import java.util.List;
+
+public sealed interface ChatResult {
+
+    record Conversation(String conversationId) implements ChatResult {
+    }
+
+    record Selected(ChatModelTier tier) implements ChatResult {
+    }
+
+    record Delta(String text) implements ChatResult {
+    }
+
+    record Answer(String answer, List<Long> recommendedItemIds) implements ChatResult {
+    }
+
+    record Refresh() implements ChatResult {
+    }
+
+    record Completed() implements ChatResult {
+    }
+
+    record Failed(Throwable cause) implements ChatResult {
+    }
+
+    record Cancelled(CancelReason reason) implements ChatResult {
+    }
+}

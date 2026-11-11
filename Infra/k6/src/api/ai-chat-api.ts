@@ -1,7 +1,8 @@
-import type { AiChatClient } from './ai-chat-client.ts';
+import type { AiChatClient, AiOutcome } from './ai-chat-client.ts';
 
 export interface ChatReply {
   completed: boolean;
+  outcome: AiOutcome;
   conversationId: string | undefined;
 }
 
@@ -13,6 +14,6 @@ export class AiChatApi {
 
   ask(message: string, conversationId?: string): ChatReply {
     const result = this.client.call(this.token, message, conversationId);
-    return { completed: result.completed, conversationId: result.conversationId };
+    return { completed: result.completed, outcome: result.outcome, conversationId: result.conversationId };
   }
 }

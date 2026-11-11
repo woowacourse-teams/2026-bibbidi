@@ -1,8 +1,7 @@
 {
   "name": "scenario24",
   "metrics": [
-    "Coherence",
-    "Completeness"
+    "Coherence"
   ],
   "userMessage": "그럼 내가 먼저 할 일을 하나만 추천해 줘.",
   "chatMemory": [

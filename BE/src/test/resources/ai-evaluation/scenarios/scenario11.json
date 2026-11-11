@@ -1,8 +1,7 @@
 {
   "name": "scenario11",
   "metrics": [
-    "Faithfulness",
-    "Correctness"
+    "Groundedness"
   ],
   "userMessage": "강남에서 오늘 예약 가능한 스튜디오 이름을 확인해서 준비 항목으로 추천해 주세요.",
   "chatMemory": [],

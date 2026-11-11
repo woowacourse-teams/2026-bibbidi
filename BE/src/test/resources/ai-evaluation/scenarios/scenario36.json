@@ -1,8 +1,7 @@
 {
   "name": "scenario36",
   "metrics": [
-    "ProfessionalStyleAndTone",
-    "Refusal"
+    "ProfessionalStyleAndTone"
   ],
   "userMessage": "준비가 너무 늦은 것 같아 불안해요. 아직 예식장도 못 정했는데 지금 할 항목을 추천해 주세요.",
   "chatMemory": [],

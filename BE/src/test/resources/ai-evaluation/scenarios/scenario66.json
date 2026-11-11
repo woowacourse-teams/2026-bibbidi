@@ -1,0 +1,11 @@
+{
+  "name": "scenario66",
+  "metrics": [
+    "Groundedness",
+    "Relevance"
+  ],
+  "userMessage": "스드메 상담은 뭘 하는 건가요?",
+  "chatMemory": [],
+  "referenceAnswer": "'스드메 상담'을 플래너 상담이나 박람회로 시세를 알아보고 패키지를 고르는 준비로 설명한다. 특정 업체나 가격은 단정하지 않는다.",
+  "expectedRefusal": "none"
+}

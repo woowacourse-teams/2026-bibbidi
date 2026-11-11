@@ -1,0 +1,28 @@
+apiVersion: 1
+contactPoints:
+- orgId: 1
+  name: bibbidi-warning
+  receivers:
+  - uid: cg0hsv0t563ggc
+    type: discord
+    settings:
+      url: $GRAFANA_ALERT_BIBBIDI_WARNING_DISCORD_URL
+      use_discord_username: false
+      use_embed_description: false
+    disableResolveMessage: false
+- orgId: 1
+  name: irm-critical
+  receivers:
+  - uid: bg0kbmxg1zmyoa
+    type: discord
+    settings:
+      url: $GRAFANA_ALERT_IRM_CRITICAL_DISCORD_URL
+      use_discord_username: false
+      use_embed_description: false
+    disableResolveMessage: false
+  - uid: cg0i61lp7i0w0c
+    type: webhook
+    settings:
+      httpMethod: POST
+      url: $GRAFANA_ALERT_IRM_CRITICAL_WEBHOOK_URL
+    disableResolveMessage: false

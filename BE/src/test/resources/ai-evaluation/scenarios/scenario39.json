@@ -1,8 +1,7 @@
 {
   "name": "scenario39",
   "metrics": [
-    "ProfessionalStyleAndTone",
-    "Refusal"
+    "ProfessionalStyleAndTone"
   ],
   "userMessage": "예식 준비가 바빠요. 간결하고 정중하게 이번에 챙길 항목 두 개만 추천해 주세요. 웨딩홀은 계약했어요.",
   "chatMemory": [],

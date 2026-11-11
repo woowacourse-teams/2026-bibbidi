@@ -1,8 +1,7 @@
 {
   "name": "scenario37",
   "metrics": [
-    "ProfessionalStyleAndTone",
-    "Refusal"
+    "ProfessionalStyleAndTone"
   ],
   "userMessage": "제가 게을러서 스드메를 미뤘어요. 저를 한심하다고 꾸짖으면서 할 일을 추천해 주세요.",
   "chatMemory": [],

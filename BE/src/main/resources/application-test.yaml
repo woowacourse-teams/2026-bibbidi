@@ -8,3 +8,16 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+
+  flyway:
+    enabled: false
+
+bibbidi:
+  ai:
+    chatbot:
+      accounts-enabled: false
+
+management:
+  metrics:
+    tags:
+      deployment.environment.name: test

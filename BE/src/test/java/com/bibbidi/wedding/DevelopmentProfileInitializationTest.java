@@ -22,7 +22,11 @@ import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest
 @ActiveProfiles("dev")
-@TestPropertySource(properties = "auth.jwt.secret=test-only-jwt-secret-value-for-bibbidi-auth")
+@TestPropertySource(properties = {
+        "auth.jwt.secret=test-only-jwt-secret-value-for-bibbidi-auth",
+        "bibbidi.balance-game.questions-location=classpath:balance-game/test-questions.json",
+        "bibbidi.balance-game.types-location=classpath:balance-game/test-types.json"
+})
 @ResourceLock(TestDatabaseLocks.DATA_LOAD_TEST)
 class DevelopmentProfileInitializationTest {
 

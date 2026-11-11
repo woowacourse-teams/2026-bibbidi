@@ -1,8 +1,8 @@
 {
   "name": "scenario23",
   "metrics": [
-    "Coherence",
-    "Completeness"
+    "Completeness",
+    "Coherence"
   ],
   "userMessage": "그것까지 끝냈어. 다음 준비 항목은 뭐야?",
   "chatMemory": [

@@ -17,6 +17,35 @@ export class UserIds {
   }
 }
 
+// 시드(generate-seed.py)가 만든 사용자 한 명의 데이터. 사용자 i(0부터)는 체크리스트 1개, 항목 3개, 일정 1개를 가진다.
+// 항목은 모두 준비 목록에서 추가한 것이라 제목·카테고리를 바꿀 수 없다.
+export class Seeded {
+  static userId(index: number): number {
+    return UserIds.pooled(index);
+  }
+
+  static checklistItemId(index: number): number {
+    return LOAD_TEST_USER_ID_BASE + index * 3 + 1;
+  }
+
+  static appointmentId(index: number): number {
+    return LOAD_TEST_USER_ID_BASE + index + 1;
+  }
+
+  // 시드가 사용자 i에게 담아 둔 준비 목록 항목 번호(1부터)는 (i*3+j) % 169 + 1 이다. 그 뒤 번호부터 골라 중복을 피한다.
+  static unusedCatalogRank(index: number, offset: number, catalogSize: number): number {
+    return (index * 3 + 3 + offset) % catalogSize;
+  }
+}
+
+// AI 대화 사용자는 신규 사용자와 ID가 겹치지 않게 반복 번호에 이 값을 더한다. 신규 사용자는 이 값 미만의 반복 번호만 쓴다.
+export const AI_USER_ITERATION_OFFSET = 50_000;
+
+// 시드(generate-seed.py)가 만든 리프레시 세션의 토큰. 번호마다 하나이고 한 번만 쓸 수 있다.
+export function refreshTokenFor(index: number): string {
+  return `loadtest-refresh-${index}`;
+}
+
 export interface PooledUser {
   userId: number;
   appointmentId: number;

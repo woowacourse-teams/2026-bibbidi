@@ -252,6 +252,7 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[*].checklistItemId",
                         containsInAnyOrder((int) catalogSourcedItemId, (int) customItemId)))
+                .andExpect(jsonPath("$[*].title", containsInAnyOrder("계약서 확인", "청첩장 문구 정하기")))
                 .andExpect(jsonPath("$[*].categoryName", everyItem(is("웨딩홀"))))
                 .andExpect(jsonPath("$[*].status", everyItem(is("prev"))))
                 .andDo(document(
@@ -281,6 +282,56 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
                                 )
                         )
                 );
+    }
+
+    @Test
+    @Sql("/fixtures/checklist-catalog-fixture.sql")
+    @Sql(statements = "INSERT INTO categories (id, name, display_order, created_at, updated_at) VALUES (3, '신혼여행', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+    @DisplayName("서로 다른 카테고리의 할 일에 각 카테고리 이름을 반환한다")
+    void shouldFindUnscheduledItemsFromMultipleCategories() throws Exception {
+        // given
+        long weddingHallItemId = addCatalogItem(100L);
+        long honeymoonItemId = writeCustomItem("여행 일정 정하기", 3L);
+
+        // when, then
+        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[?(@.checklistItemId == " + weddingHallItemId + ")].categoryName")
+                        .value(containsInAnyOrder("웨딩홀")))
+                .andExpect(jsonPath("$[?(@.checklistItemId == " + honeymoonItemId + ")].categoryName")
+                        .value(containsInAnyOrder("신혼여행")));
+    }
+
+    @Test
+    @Sql("/fixtures/checklist-catalog-fixture.sql")
+    @Sql(statements = "INSERT INTO checklist_items (id, checklist_id, category_id, title, status, created_at, updated_at) VALUES (200, 1000, 999, '카테고리가 없는 할 일', 'CONTINUE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+    @DisplayName("카테고리가 누락된 할 일도 제외하지 않고 이름을 null로 반환한다")
+    void shouldKeepUnscheduledItemWithMissingCategory() throws Exception {
+        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].checklistItemId").value(200))
+                .andExpect(jsonPath("$[0].title").value("카테고리가 없는 할 일"))
+                .andExpect(jsonPath("$[0].categoryName").value(nullValue()))
+                .andExpect(jsonPath("$[0].status").value("continue"));
+    }
+
+    @Test
+    @DisplayName("빈 체크리스트의 일정이 필요한 할 일은 빈 배열이다")
+    void shouldReturnEmptyUnscheduledItems() throws Exception {
+        // given
+        mockMvc.perform(post("/api/checklists")
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                .andExpect(status().isCreated());
+
+        // when, then
+        mockMvc.perform(get("/api/checklists/me/unscheduled-items")
+                        .header(AUTHORIZATION, bearerToken(USER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
@@ -459,10 +510,14 @@ class ChecklistControllerIntegrationTest extends BibbidiIntegrationTest {
     }
 
     private long writeCustomItem(String title) throws Exception {
+        return writeCustomItem(title, 2L);
+    }
+
+    private long writeCustomItem(String title, Long categoryId) throws Exception {
         String response = mockMvc.perform(post("/api/checklists/me/items")
                         .header(AUTHORIZATION, bearerToken(USER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new CreateChecklistItemRequest(title, 2L))))
+                        .content(objectMapper.writeValueAsString(new CreateChecklistItemRequest(title, categoryId))))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()

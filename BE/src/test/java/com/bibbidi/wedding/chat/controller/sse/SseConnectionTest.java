@@ -6,16 +6,25 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import com.bibbidi.wedding.chat.controller.dto.resp.ChatResponse;
 import com.bibbidi.wedding.chat.controller.sse.dto.SseEvent;
 import com.bibbidi.wedding.chat.support.RecordingSseEmitter;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Future;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 class SseConnectionTest {
 
@@ -28,15 +37,51 @@ class SseConnectionTest {
     private Future<?> task;
     private Future<?> timer;
 
+    private ListAppender<ILoggingEvent> logs;
+
     @BeforeEach
     void setUp() {
         emitter = new RecordingSseEmitter();
-        connection = new SseConnection(emitter, new SseEvent(ChatEventType.FAILURE, "공개 실패 안내"),
-                System.nanoTime() + Duration.ofSeconds(30).toNanos());
+        connection = new SseConnection(emitter, System.nanoTime() + Duration.ofSeconds(30).toNanos());
         task = mock(Future.class);
         timer = mock(Future.class);
         connection.attachTask(task);
         connection.attachTimeout(timer);
+        logs = new ListAppender<>();
+        logs.start();
+        ((Logger) LoggerFactory.getLogger(SseConnection.class)).addAppender(logs);
+    }
+
+    @AfterEach
+    void tearDown() {
+        ((Logger) LoggerFactory.getLogger(SseConnection.class)).detachAppender(logs);
+    }
+
+    @Test
+    @DisplayName("AI 한도 초과로 실패하면 한도 초과 안내를 보내고 응답을 닫으며, WARN으로 기록한다")
+    void capacityExceededSendsTheRetryFailureAndLogsWarn() {
+        // when
+        connection.fail(new BusinessException(ClientError.AI_CAPACITY_EXCEEDED, "호출 한도 초과"));
+
+        // then
+        assertThat(emitter.log()).containsExactly(SEND, COMPLETE);
+        assertThat(emitter.sentData().getFirst()).contains(new ChatResponse.Failure(
+                ClientError.AI_CAPACITY_EXCEEDED.errorCode(), ClientError.AI_CAPACITY_EXCEEDED.message()));
+        assertThat(logs.list).extracting(ILoggingEvent::getLevel).containsExactly(Level.WARN);
+        verify(timer).cancel(false);
+    }
+
+    @Test
+    @DisplayName("예상하지 못한 오류로 실패하면 공통 오류 안내를 보내고 응답을 닫으며, ERROR로 기록한다")
+    void unexpectedFailureSendsTheInternalErrorAndLogsError() {
+        // when
+        connection.fail(new IllegalStateException("외부 API 비밀 원문"));
+
+        // then
+        assertThat(emitter.log()).containsExactly(SEND, COMPLETE);
+        assertThat(emitter.sentData().getFirst()).contains(new ChatResponse.Failure(
+                ClientError.INTERNAL_ERROR.errorCode(), ClientError.INTERNAL_ERROR.message()));
+        assertThat(logs.list).extracting(ILoggingEvent::getLevel).containsExactly(Level.ERROR);
     }
 
     @Test
@@ -147,8 +192,7 @@ class SseConnectionTest {
     @DisplayName("타이머가 실행되지 않았어도 제한 시간이 지나면 완료 처리를 거절한다")
     void completionChecksTheDeadlineEvenWhenTheTimerHasNotRunYet() {
         // given
-        SseConnection expired = new SseConnection(emitter, new SseEvent(ChatEventType.FAILURE, "공개 실패 안내"),
-                System.nanoTime() - 1);
+        SseConnection expired = new SseConnection(emitter, System.nanoTime() - 1);
         Runnable remember = () -> emitter.log().add(REMEMBER);
 
         // when, then

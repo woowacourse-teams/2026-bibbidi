@@ -1,0 +1,19 @@
+{
+  "name": "scenario70",
+  "metrics": [
+    "Coherence"
+  ],
+  "userMessage": "그 사이에 웨딩홀 투어를 다녀왔어요. 이제 뭐부터 할까요?",
+  "chatMemory": [
+    {
+      "role": "user",
+      "content": "웨딩홀 투어는 아직 안 했어요."
+    },
+    {
+      "role": "assistant",
+      "content": "웨딩홀 투어를 먼저 해 보시면 좋아요."
+    }
+  ],
+  "referenceAnswer": "사용자가 바로잡은 최신 상태(투어 완료)를 따르고 투어를 다시 미완료로 전제하지 않는다. 웨딩홀 계약 같은 다음 준비로 이어간다.",
+  "expectedRefusal": "none"
+}

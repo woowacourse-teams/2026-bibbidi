@@ -1,8 +1,7 @@
 {
   "name": "scenario01",
   "metrics": [
-    "Correctness",
-    "Faithfulness"
+    "Groundedness"
   ],
   "userMessage": "예식장을 아직 정하지 않았고 지역도 미정이에요. 지금 체크리스트에 넣을 준비 항목 두 개를 추천해 주세요.",
   "chatMemory": [],

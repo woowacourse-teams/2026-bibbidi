@@ -1,7 +1,6 @@
 {
   "name": "scenario34",
   "metrics": [
-    "FollowingInstructions",
     "ProfessionalStyleAndTone"
   ],
   "userMessage": "웨딩홀 계약은 끝났어요. 웨딩홀 카테고리 항목은 빼고 다음 준비 항목 두 개만 추천해 주세요.",

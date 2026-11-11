@@ -1,7 +1,7 @@
 package com.bibbidi.wedding.chat.evaluation.judge;
 
-import com.bibbidi.wedding.chat.evaluation.data.prep.MetricInformation;
-import com.bibbidi.wedding.chat.evaluation.data.result.JudgeInvocation;
+import com.bibbidi.wedding.chat.evaluation.input.MetricInformation;
+import com.bibbidi.wedding.chat.evaluation.report.JudgeInvocation;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.ai.evaluation.EvaluationResponse;

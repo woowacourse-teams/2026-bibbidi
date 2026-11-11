@@ -1,8 +1,7 @@
 {
   "name": "scenario03",
   "metrics": [
-    "Correctness",
-    "Faithfulness"
+    "Groundedness"
   ],
   "userMessage": "스튜디오 촬영 날짜를 잡았지만 촬영 드레스는 고르지 않았어요. 필요한 준비 항목을 추천해 주세요.",
   "chatMemory": [],

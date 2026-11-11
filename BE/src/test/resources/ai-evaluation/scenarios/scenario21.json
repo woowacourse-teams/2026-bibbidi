@@ -1,8 +1,8 @@
 {
   "name": "scenario21",
   "metrics": [
-    "Coherence",
-    "Completeness"
+    "Completeness",
+    "Coherence"
   ],
   "userMessage": "그럼 다음으로 할 준비 항목 두 개를 추천해 줘.",
   "chatMemory": [

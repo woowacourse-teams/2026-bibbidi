@@ -1,0 +1,20 @@
+{
+  "name": "scenario72",
+  "metrics": [
+    "Relevance",
+    "Completeness"
+  ],
+  "userMessage": "그건 이미 등록했어요. 다른 걸로 하나 더 추천해 주세요.",
+  "chatMemory": [
+    {
+      "role": "user",
+      "content": "스드메 쪽 준비를 추천해 주세요."
+    },
+    {
+      "role": "assistant",
+      "content": "스드메 상담을 먼저 해 보시면 좋아요."
+    }
+  ],
+  "referenceAnswer": "'스드메 상담'을 다시 추천하지 않고 다른 실제 카탈로그 항목을 하나 추천한다.",
+  "expectedRefusal": "none"
+}

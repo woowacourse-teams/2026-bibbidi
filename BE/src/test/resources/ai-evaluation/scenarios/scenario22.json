@@ -1,8 +1,8 @@
 {
   "name": "scenario22",
   "metrics": [
-    "Coherence",
-    "Completeness"
+    "Completeness",
+    "Coherence"
   ],
   "userMessage": "방금 말한 상황을 반영해서 촬영 준비 항목을 추천해 줘.",
   "chatMemory": [

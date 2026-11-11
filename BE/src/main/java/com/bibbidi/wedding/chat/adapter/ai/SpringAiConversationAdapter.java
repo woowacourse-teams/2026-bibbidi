@@ -1,85 +1,174 @@
 package com.bibbidi.wedding.chat.adapter.ai;
 
-import com.bibbidi.wedding.chat.service.dto.prompt.BibbidiCustomChatPromptContext;
-import com.bibbidi.wedding.chat.service.dto.result.AiResponseStream;
+import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRequest;
+import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
+import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
+import com.bibbidi.wedding.chat.adapter.ai.parser.ReactiveChatAnswerStream;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ModelClassifier;
+import com.bibbidi.wedding.chat.adapter.ai.routing.ModelSelectPlan;
+import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
+import com.bibbidi.wedding.chat.service.dto.result.ChatResult.Refresh;
 import com.bibbidi.wedding.chat.service.port.AiConversationPort;
+import com.bibbidi.wedding.common.exception.BusinessException;
+import com.bibbidi.wedding.common.exception.ClientError;
+import com.openai.errors.RateLimitException;
 import java.util.List;
-import java.util.Map;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
+import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
-import tools.jackson.databind.ObjectMapper;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException;
 
 @Component
+@Slf4j
 public class SpringAiConversationAdapter implements AiConversationPort {
 
-    private final ChatClient chatClient;
-    private final BibbidiInMemoryChatMemory bibbidiInMemoryChatMemory;
-    private final ObjectMapper mapper;
-    private final AiChatStreamRecorder recorder;
+    private static final String OUT_OF_SCOPE_REFUSAL =
+            "저는 결혼 준비를 돕는 도우미라 그 요청은 도와드리기 어려워요. 웨딩홀, 스드메, 일정·체크리스트 같은 결혼 준비 질문을 말씀해 주세요.";
 
+    private final SpringAiChatClient chatClient;
+    private final JacksonChatAnswerParser answerParser;
+    private final ChatMemory chatMemory;
+
+    private final ModelClassifier classifier;
+
+    @Autowired
     public SpringAiConversationAdapter(
-            ChatClient chatClient,
-            BibbidiInMemoryChatMemory bibbidiInMemoryChatMemory,
-            ObjectMapper mapper,
-            AiChatStreamRecorder recorder
+            SpringAiChatClient chatClient,
+            JacksonChatAnswerParser answerParser,
+            ChatMemory chatMemory,
+            ModelClassifier classifier
     ) {
         this.chatClient = chatClient;
-        this.bibbidiInMemoryChatMemory = bibbidiInMemoryChatMemory;
-        this.mapper = mapper;
-        this.recorder = recorder;
+        this.answerParser = answerParser;
+        this.chatMemory = chatMemory;
+        this.classifier = classifier;
     }
 
     @Override
-    public AiResponseStream stream(String conversationKey, String userPrompt, BibbidiCustomChatPromptContext context) {
-        bibbidiInMemoryChatMemory.remember(conversationKey, context);
-
-        List<Message> memories = bibbidiInMemoryChatMemory.get(conversationKey);
-        BibbidiCustomChatPromptContext currentContext = bibbidiInMemoryChatMemory.bibbidiCustomContext(conversationKey);
-
-        Message checklist = new UserMessage(
-                mapper.writeValueAsString(
-                        Map.of(
-                                "checklist", currentContext.checklist(),
-                                "recommendableItemIds", currentContext.recommendableItemIds()
-                        )
+    public Flux<ChatResult> stream(Long userId, String conversationKey, String userPrompt) {
+        return mapModelErrors(Flux.defer(() -> {
+                            ChatModelRequest request = new ChatModelRequest(
+                                    userId, conversationKey, new UserMessage(userPrompt));
+                            return classifier.classify(conversationKey, userPrompt)
+                                    .flatMapMany(classification -> {
+                                        if (classification.isBlocked()) {
+                                            log.info(
+                                                    "도메인 밖 또는 인젝션 요청 차단. injection={}, hijack={}",
+                                                    classification.injection(),
+                                                    classification.hijack()
+                                            );
+                                            return Flux.just(
+                                                    new ChatResult.Delta(OUT_OF_SCOPE_REFUSAL),
+                                                    new ChatResult.Answer(OUT_OF_SCOPE_REFUSAL, List.of())
+                                            );
+                                        }
+                                        ModelSelectPlan plan = ModelSelectPlan.startingAt(classification.tier());
+                                        return attempt(request, plan)
+                                                .concatWith(refreshIfWritten(request))
+                                                .onErrorResume(
+                                                        error -> refreshIfWritten(request)
+                                                                .concatWith(Mono.error(error))
+                                                );
+                                    });
+                        }
                 )
-        );
-        Message catalog = new UserMessage(
-                mapper.writeValueAsString(
-                        Map.of("catalog", currentContext.catalog())
-                )
-        );
-
-        UserMessage userMessage = new UserMessage(userPrompt);
-
-        Flux<String> answerFlux = recorder.record(
-                        userPrompt,
-                        chatClient.prompt()
-                                .messages(memories)
-                                .messages(checklist, catalog)
-                                .messages(userMessage)
-                                .stream()
-                                .chatResponse()
-                )
-                .map(AiChatStreamRecorder::textOf)
-                .filter(text -> !text.isEmpty());
-
-        return new AiResponseStream(
-                answerFlux,
-                currentContext.recommendableItemIds()
         );
     }
 
-    @Override
-    public void remember(String conversationKey, String userPrompt, String answer) {
-        bibbidiInMemoryChatMemory.add(
-                conversationKey,
-                List.of(new UserMessage(userPrompt), new AssistantMessage(answer))
+    private Mono<ChatResult> refreshIfWritten(ChatModelRequest request) {
+        return Mono.defer(() -> {
+            if (request.writeSucceeded().get()) {
+                return Mono.just(new Refresh());
+            }
+            return Mono.empty();
+        });
+    }
+
+    private Flux<ChatResult> mapModelErrors(Flux<ChatResult> results) {
+        return results
+                .onErrorMap(error -> hasCause(error, ThrottlingException.class),
+                        error -> new BusinessException(
+                                ClientError.AI_CAPACITY_EXCEEDED, "AI 호출 한도 초과", error))
+                .onErrorMap(error -> hasCause(error, RateLimitException.class),
+                        _ -> new BusinessException(
+                                ClientError.AI_CAPACITY_EXCEEDED, "OpenAI 호출 한도 초과"))
+                .onErrorMap(this::isEmptyAdvisorResponse,
+                        error -> new BusinessException(
+                                ClientError.INTERNAL_ERROR, "AI 응답 없음", error))
+                .onErrorMap(error -> !(error instanceof BusinessException),
+                        error -> new BusinessException(
+                                ClientError.INTERNAL_ERROR,
+                                "AI 모델 호출 실패. type=" + error.getClass().getSimpleName()));
+    }
+
+    private Flux<ChatResult> attempt(ChatModelRequest request, ModelSelectPlan plan) {
+        return Flux.defer(() -> {
+                    ChatModelTier tier = plan.tier();
+                    List<Message> previousMessages = chatMemory.get(request.conversationKey());
+                    AtomicBoolean sentDelta = new AtomicBoolean();
+                    return Flux.concat(
+                                    Flux.just(new ChatResult.Selected(tier)),
+                                    streamAnswer(request, tier)
+                            )
+                            .doOnNext(result -> {
+                                if (result instanceof ChatResult.Delta) {
+                                    sentDelta.set(true);
+                                }
+                            })
+                            .onErrorResume(error -> {
+                                        if (sentDelta.get() || request.writeAttempted().get() || !plan.hasFallback()) {
+                                            return Flux.error(error);
+                                        }
+                                        chatMemory.clear(request.conversationKey());
+                                        chatMemory.add(request.conversationKey(), previousMessages);
+                                        return attempt(request, plan.fallback());
+                                    }
+                            );
+                }
         );
     }
 
+    private Flux<ChatResult> streamAnswer(ChatModelRequest request, ChatModelTier tier) {
+        return Flux.defer(() -> {
+            ReactiveChatAnswerStream answer = answerParser.newSession();
+            Flux<ChatResult> deltas = chatClient.streamReply(request, tier)
+                    .map(this::textOf)
+                    .filter(text -> !text.isEmpty())
+                    .publishOn(Schedulers.boundedElastic()) // 사용 가능한 CPU 코어 수 * 10 개
+                    .map(answer::acceptChunk)
+                    .filter(delta -> !delta.isEmpty())
+                    .map(ChatResult.Delta::new);
+            return deltas.concatWith(Flux.defer(() -> Flux.just(answer.buildAnswer())));
+        });
+    }
+
+    private String textOf(ChatResponse response) {
+        if (response.getResult() == null || response.getResult().getOutput().getText() == null) {
+            return "";
+        }
+        return response.getResult().getOutput().getText();
+    }
+
+    private boolean hasCause(Throwable error, Class<? extends Throwable> type) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (type.isInstance(cause)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isEmptyAdvisorResponse(Throwable exception) {
+        return exception instanceof IllegalArgumentException
+                && "conversationId cannot be null".equals(exception.getMessage());
+    }
 }

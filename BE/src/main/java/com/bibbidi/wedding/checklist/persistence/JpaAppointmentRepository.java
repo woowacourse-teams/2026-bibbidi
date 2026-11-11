@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -80,10 +81,15 @@ public interface JpaAppointmentRepository extends JpaRepository<JpaAppointmentEn
               AND (appointment.date > :date
                    OR (appointment.date = :date
                        AND (appointment.startTime IS NULL OR appointment.startTime >= :time)))
+            ORDER BY appointment.date ASC,
+                     CASE WHEN appointment.startTime IS NULL THEN 1 ELSE 0 END ASC,
+                     appointment.startTime ASC,
+                     appointment.id ASC
             """)
     List<JpaAppointmentEntity> findNearby(
             @Param("userId") Long userId,
             @Param("date") LocalDate date,
-            @Param("time") LocalDateTime time
+            @Param("time") LocalDateTime time,
+            Limit limit
     );
 }

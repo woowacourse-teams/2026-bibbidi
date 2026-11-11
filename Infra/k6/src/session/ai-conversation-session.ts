@@ -1,6 +1,6 @@
-import { sleep } from 'k6';
 import type { Session, SessionContext } from './session.ts';
-import { UserIds } from './users.ts';
+import { think } from './session.ts';
+import { AI_USER_ITERATION_OFFSET, UserIds } from './users.ts';
 
 const QUESTIONS = [
   '결혼 준비를 언제부터 시작하면 좋을까요?',
@@ -17,15 +17,14 @@ const QUESTIONS = [
 
 export interface AiConversationOptions {
   turns: number;
-  thinkSeconds: number;
-  restSeconds: number;
 }
 
+// AI: 질문 3턴. 턴 사이에 생각하는 시간을 쉰다. 실패 안내를 받으면 그 대화는 거기서 끝낸다.
 export class AiConversationSession implements Session {
   constructor(private readonly options: AiConversationOptions) {}
 
   run({ data, iteration, apis }: SessionContext): void {
-    const chat = apis.chatFor(UserIds.fresh(data.runId, iteration));
+    const chat = apis.chatFor(UserIds.fresh(data.runId, AI_USER_ITERATION_OFFSET + iteration));
     let conversationId: string | undefined;
 
     for (let turn = 0; turn < this.options.turns; turn += 1) {
@@ -35,12 +34,8 @@ export class AiConversationSession implements Session {
         break;
       }
       if (turn < this.options.turns - 1) {
-        sleep(this.options.thinkSeconds);
+        think();
       }
-    }
-
-    if (this.options.restSeconds > 0) {
-      sleep(this.options.restSeconds);
     }
   }
 
