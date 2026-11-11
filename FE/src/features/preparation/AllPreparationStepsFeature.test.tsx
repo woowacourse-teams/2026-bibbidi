@@ -301,10 +301,28 @@ describe("단일 준비 로드맵", () => {
       status: "authenticated",
       user: { id: 1, nickname: "비비디" },
     };
-    await show();
+    let resolveChecklist!: (checklist: ChecklistQueryModel) => void;
+    mocks.getChecklist.mockReturnValueOnce(
+      new Promise<ChecklistQueryModel>((resolve) => {
+        resolveChecklist = resolve;
+      }),
+    );
+    const { container } = await show();
+    const roadmap = container.querySelector(
+      "[data-page-content-state='success']",
+    );
+    expect(roadmap?.getAttribute("data-personal-preparation-state")).toBe(
+      "loading",
+    );
+    expect(screen.queryByRole("progressbar")).toBeNull();
+
+    resolveChecklist(saved);
     const progress = await screen.findByRole("progressbar", {
       name: "웨딩홀 투어와 계약 내 할 일 완료",
     });
+    expect(roadmap?.getAttribute("data-personal-preparation-state")).toBe(
+      "ready",
+    );
     expect(progress.getAttribute("aria-valuenow")).toBe("100");
     expect(progress.getAttribute("aria-valuetext")).toBe("1개 중 1개 완료");
     expect(screen.getByText("내 할 일 완료")).toBeTruthy();

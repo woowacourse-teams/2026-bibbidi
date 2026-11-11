@@ -6,7 +6,6 @@ import {
 } from "../features/social-login/view/LoginModal";
 
 import { ServiceLayout } from "../layouts/ServiceLayout";
-import { HomeEntryPage } from "../pages/HomeEntryPage";
 import { PreparationCatalogPage } from "../pages/PreparationCatalogPage";
 
 const pageRoutes: RouteObject[] = [
@@ -41,7 +40,7 @@ const pageRoutes: RouteObject[] = [
       },
       {
         path: "/",
-        Component: HomeEntryPage,
+        Component: PreparationCatalogPage,
       },
       {
         path: "/preparation",

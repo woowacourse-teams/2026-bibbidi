@@ -168,7 +168,13 @@ export function PreparationRoadmap({
     if (!pending) setOpenStage(null);
   };
   return (
-    <div className="preparation-roadmap" data-page-content-state="success">
+    <div
+      className="preparation-roadmap"
+      data-page-content-state="success"
+      data-personal-preparation-state={
+        isGuest ? "guest" : viewModel.progressStatus
+      }
+    >
       <RoadmapHeader
         categoryTitle={viewModel.categoryTitle}
         summary={viewModel.summary}

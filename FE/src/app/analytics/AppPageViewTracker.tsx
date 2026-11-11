@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  type ReactNode,
-} from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 
 import { useAuth } from "../../features/auth";
 import type { AnalyticsClient } from "../../infrastructure/analytics";
@@ -14,13 +7,8 @@ import type { LandingPage } from "./pageView";
 import {
   createRouterPageViewTrackingState,
   startRouterPageViewTracking,
-  trackPageView,
   type SubscribableRouter,
 } from "./routerPageViewTracking";
-
-export const HomeEntryPageViewContext = createContext<(() => void) | null>(
-  null,
-);
 
 interface AppPageViewTrackerProps {
   analytics: AnalyticsClient;
@@ -44,11 +32,6 @@ export function AppPageViewTracker({
     authState.status === "authenticated" ||
     authState.status === "guest" ||
     authState.status === "onboardingRequired";
-
-  const trackHomeEntryPageView = useCallback(() => {
-    if (router.state.location.pathname !== "/" || !isAppRouteSettled) return;
-    trackPageView("/", analytics, origin, trackingState.current);
-  }, [analytics, isAppRouteSettled, origin, router]);
 
   useLayoutEffect(() => {
     if (isAppRouteSettled) {
@@ -97,13 +80,8 @@ export function AppPageViewTracker({
       analytics,
       origin,
       trackingState.current,
-      true,
     );
   }, [analytics, authState, isAppRouteSettled, origin, router]);
 
-  return (
-    <HomeEntryPageViewContext.Provider value={trackHomeEntryPageView}>
-      {children}
-    </HomeEntryPageViewContext.Provider>
-  );
+  return <>{children}</>;
 }

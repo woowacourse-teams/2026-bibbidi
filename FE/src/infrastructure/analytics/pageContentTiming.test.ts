@@ -31,7 +31,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function setup(path = "/preparation") {
+function setup(path = "/preparation", measure?: "personal") {
   let notify: Parameters<TimingRouter["subscribe"]>[0] = () => {};
   const router: TimingRouter = {
     state: { location: { pathname: path }, navigation: {} },
@@ -41,7 +41,7 @@ function setup(path = "/preparation") {
     }),
   };
   const track = vi.fn();
-  stop = startPageContentTiming(router, track);
+  stop = startPageContentTiming(router, track, measure);
   return {
     track,
     navigate: (pathname: string) =>
@@ -180,4 +180,46 @@ describe("준비 목록 첫 콘텐츠 시간", () => {
     });
     expect(() => navigate("/calendar")).not.toThrow();
   });
+});
+
+describe("개인 준비 현황 표시 시간", () => {
+  it("공개 목록이 먼저 떠도 내 체크 상태와 진행률이 반영될 때까지 성공을 기록하지 않는다", async () => {
+    const { track } = setup("/", "personal");
+    await content("success");
+    const roadmap = document.querySelector("[data-page-content-state]")!;
+    roadmap.setAttribute("data-personal-preparation-state", "loading");
+    await Promise.resolve();
+    paint();
+    expect(track).not.toHaveBeenCalled();
+
+    now = 2000;
+    roadmap.setAttribute("data-personal-preparation-state", "ready");
+    await Promise.resolve();
+    expect(track).not.toHaveBeenCalled();
+    paint();
+    expect(track).toHaveBeenCalledExactlyOnceWith({
+      name: "personal_preparation_timing",
+      parameters: expect.objectContaining({
+        page_path: "/",
+        navigation_kind: "document",
+        measurement_version: 1,
+        duration_ms: 2000,
+        outcome: "success",
+      }),
+    });
+  });
+
+  it.each(["guest", "error"])(
+    "%s를 개인 현황 성공과 구분한다",
+    async (state) => {
+      const { track } = setup("/", "personal");
+      await content("success");
+      document
+        .querySelector("[data-page-content-state]")!
+        .setAttribute("data-personal-preparation-state", state);
+      await Promise.resolve();
+      paint();
+      expect(track.mock.calls[0][0].parameters.outcome).toBe(state);
+    },
+  );
 });

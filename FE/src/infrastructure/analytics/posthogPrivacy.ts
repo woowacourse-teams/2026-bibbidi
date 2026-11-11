@@ -1,5 +1,4 @@
 import type { CaptureResult, PostHogConfig } from "posthog-js";
-import { HOME_ENTRY_EXPERIMENT_KEY } from "./homeEntryExperiment";
 
 // 경로에 개인 식별자나 OAuth 결과를 넣지 않는다. 새 화면은 검토 후 추가한다.
 const PUBLIC_PATHS = new Set([
@@ -117,6 +116,7 @@ const ALLOWED_PROPERTIES = new Set([
   "from_status",
   "page_load_id",
   "measurement_id",
+  "measurement_version",
   "navigation_kind",
   "duration_ms",
 ]);
@@ -199,21 +199,6 @@ export function sanitizePostHogEvent(
   }
   if (event.event === "$web_vitals") {
     Object.assign(properties, webVitalsProperties(event.properties));
-  }
-  const experimentVariant =
-    event.properties[`$feature/${HOME_ENTRY_EXPERIMENT_KEY}`];
-  if (experimentVariant === "control" || experimentVariant === "test") {
-    properties[`$feature/${HOME_ENTRY_EXPERIMENT_KEY}`] = experimentVariant;
-  }
-  if (
-    event.event === "$feature_flag_called" &&
-    event.properties.$feature_flag === HOME_ENTRY_EXPERIMENT_KEY
-  ) {
-    properties.$feature_flag = HOME_ENTRY_EXPERIMENT_KEY;
-    const response = event.properties.$feature_flag_response;
-    if (response === "control" || response === "test" || response === false) {
-      properties.$feature_flag_response = response;
-    }
   }
   // Person에는 첫 유입 캠페인과 도메인만 남기고 초기 URL·referrer 원문은 제거한다.
   const initialAttribution = Object.fromEntries(

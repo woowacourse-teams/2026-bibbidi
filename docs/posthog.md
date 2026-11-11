@@ -48,9 +48,11 @@ Issue: [#300](https://github.com/woowacourse-teams/2026-bibbidi/issues/300). 가
 
 ## SDK와 리플레이
 
-공식 `posthog-js` 고정 버전을 사용한다. `autocapture`, 자동 pageview/pageleave, dead click, heatmap, 예외, 콘솔, 네트워크 본문·헤더, canvas, JSON-LD, survey와 자동 웹 실험을 끈다. 성능 수집은 아래 FCP·LCP와 준비 목록 표시 시간만 허용한다. 첫 화면 실험에 필요한 기능 플래그는 사용한다. IP 수집은 SDK 옵션으로는 끌 수 없다. PostHog 프로젝트 설정 **Discard client IP data**를 켠다. 원격 Replay 설정을 받는 요청 자체를 끄지는 않는다.
+공식 `posthog-js` 고정 버전을 사용한다. `autocapture`, 자동 pageview/pageleave, dead click, heatmap, 예외, 콘솔, 네트워크 본문·헤더, canvas, JSON-LD, survey, 기능 플래그 평가와 자동 웹 실험을 끈다. 성능 수집은 아래 FCP·LCP, 준비 목록 및 개인 준비 현황 표시 시간으로 제한한다. IP 수집은 SDK 옵션으로는 끌 수 없다. PostHog 프로젝트 설정 **Discard client IP data**를 켠다. 원격 Replay 설정을 받는 요청 자체를 끄지는 않는다.
 
-## 첫 화면 A/B 실험 (#324)
+## 첫 화면 A/B 실험 이력 (#324, #812)
+
+#812에서 첫 화면 분기를 제거했다. 현재 `/`과 `/preparation`은 준비 목록을 열며, 캘린더는 메뉴에서 이동한다. 아래는 제거 전 실험 설정이다.
 
 - `/` 진입 시 PostHog 다변량 기능 플래그 `home-entry-calendar`를 읽는다. `control`은 기존 준비 목록을, `test`는 `/calendar`를 첫 화면으로 보여준다. `/preparation`은 실험군과 관계없이 준비 목록을 연다. 카테고리로 연결된 기존 `/?categoryId=...` 링크도 준비 목록을 연다.
 - [PostHog 실험](https://us.posthog.com/project/632848/experiments/469553)은 `Draft`로 만들었다. 기능 플래그 키는 `home-entry-calendar`, 변형은 `control`/`test` 각 50%, 릴리스 조건은 전체 사용자 100%다. 개발 서버에서 두 변형과 노출 이벤트를 확인한 뒤 실험을 시작한다. 플래그가 없거나 조회가 실패하면 기존 준비 목록을 보여준다. 브라우저에서는 별도로 50:50 난수를 만들지 않는다.
@@ -140,7 +142,7 @@ FCP·LCP는 기존 수집 허용 경로(`/`, `/preparation`, `/login`, `/calenda
 
 준비 목록 시간은 `navigation_kind=document`이면 `performance.now()`의 기준인 문서 탐색 시작부터 측정해 HTML·JS 다운로드, 앱 시작, 인증 확인과 API 대기를 포함한다. `navigation_kind=spa`이면 router에서 목적 경로를 처음 관찰한 때부터 측정해 lazy route 대기도 포함한다. 클릭 이전과 문서 탐색 이전의 WebView 네이티브 시작 시간은 포함하지 않는다. 같은 경로의 쿼리 변경, 재조회와 재시도는 새 측정을 만들지 않는다. StrictMode의 effect 재실행과 관계없이 앱 시작 시 수집기를 한 번 연결한다.
 
-준비 목록은 첫 결과를 방문당 한 번 기록한다. 개인화된 준비 진행률 API나 이미지가 모두 끝났다는 뜻은 아니다.
+준비 목록은 첫 결과를 방문당 한 번 기록한다. 별도 이벤트인 `personal_preparation_timing`은 로그인한 사용자의 체크 상태와 진행률이 DOM에 반영되고 두 프레임을 기다린 뒤 성공을 기록한다. `measurement_version=1`을 붙이며, 게스트는 `guest`로 구분한다. 이 지표에도 이미지 로드 시간은 포함하지 않는다.
 
 | `outcome`                 | 의미                                                                                |
 | ------------------------- | ----------------------------------------------------------------------------------- |
@@ -148,7 +150,7 @@ FCP·LCP는 기존 수집 허용 경로(`/`, `/preparation`, `/login`, `/calenda
 | `empty`                   | 빈 목록 안내가 표시됨                                                               |
 | `error`                   | 오류 안내가 표시됨                                                                  |
 | `authentication_required` | 인증 만료 안내가 표시됨                                                             |
-| `abandoned`               | 완료 전에 다른 경로로 이동하거나 문서를 떠남. `/`의 캘린더 실험 리다이렉트도 포함됨 |
+| `abandoned`               | 완료 전에 다른 경로로 이동하거나 문서를 떠남. |
 | `hidden`                  | 완료 전에 탭이 백그라운드로 전환됨. 이후 복귀를 성공 시간에 합산하지 않음           |
 
 공통 속성은 `page_path`, `navigation_kind`, 문서 단위 `page_load_id`, `environment`, `app_version`, `auth_state`다. 준비 목록에는 `screen_name=preparation_catalog`, 방문 시도 단위 `measurement_id`도 있다. `auth_state`는 이벤트를 처리한 시점의 상태이며, 초기 인증 대기 중 끝난 측정은 `loading` 등으로 남을 수 있다. 로그인/게스트 식별이 끝날 때까지 최대 20건을 메모리에 보관한 후 기존 식별 정책에 따라 보낸다. 전송을 기다린 시간은 `duration_ms`에 더하지 않으며, 원래 측정 경로와 인증 상태를 유지한다. 명시적 세션 종료 시 대기는 폐기한다.
@@ -158,6 +160,7 @@ FCP·LCP는 기존 수집 허용 경로(`/`, `/preparation`, `/login`, `/calenda
 ### p99 확인과 배포 후 검증
 
 - 준비 목록의 첫 진입은 `page_content_timing`에서 `navigation_kind=document`, `outcome=success`, `screen_name=preparation_catalog`로 필터링하고 **숫자 속성 `duration_ms`의 99백분위수**와 건수를 함께 본다. p50·p95도 같은 필터에서 각각 50·95백분위수로 집계한다. 빈 목록을 정상 표시로 포함하려면 `empty`도 포함하되 비교 기간마다 같은 기준을 쓴다. 사용자별 이벤트 수의 p99가 아니다.
+- 개인 준비 현황은 `personal_preparation_timing`에서 `measurement_version=1`, `auth_state=authenticated`, `outcome=success`를 사용한다. 운영에서는 이 이슈를 반영한 CSR 버전을 기준으로 Next.js 전환 후의 p99와 표본 수를 비교한다.
 - SPA는 `navigation_kind=spa`로 따로 집계한다. 경로, `environment`, `app_version`, 브라우저·기기 유형을 맞춰 비교한다. 모바일 WebView는 SDK가 보내는 브라우저/기기 분류만으로 확실히 구분할 수 없으므로 전용 WebView 표본이라고 단정하지 않는다.
 - FCP/LCP는 각각 해당 숫자 속성이 존재하는 `$web_vitals` 이벤트에서 집계한다. 두 지표가 같은 이벤트로 묶이거나 따로 전달될 수 있으므로 이벤트 수를 페이지 방문 수로 사용하지 않는다. 필요하면 `page_load_id`로 문서를 구분한다.
 - 성공 p99와 함께 `empty/error/authentication_required/abandoned/hidden` 건수·비율을 확인한다. 최초 문서 경로에서 이탈한 후의 LCP, 지원하지 않는 브라우저 지표, 최초 백그라운드 방문의 Web Vitals, 차단기·내부 트래픽·인증 미완료 상태로 문서를 닫은 방문은 일부 또는 전부 빠질 수 있다. 누락을 0ms나 성공으로 채우지 않는다. 브라우저 수집만으로 전체 방문의 이탈률을 확정하지 않는다.
