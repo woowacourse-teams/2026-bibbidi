@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router";
+import { Link, useLocation } from "../app/navigation/navigation";
 import { PageContainer } from "../components/page-container";
 import { LoginIcon } from "../components/icons/ActionIcons";
 import { IconButton } from "../components/icon-button";

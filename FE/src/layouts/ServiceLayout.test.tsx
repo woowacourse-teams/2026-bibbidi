@@ -9,11 +9,12 @@ import {
 } from "@testing-library/react";
 import {
   MemoryRouter,
+  Outlet,
   Route,
   Routes,
   useLocation,
   useNavigate,
-} from "react-router";
+} from "../test/memoryNavigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const analyticsMocks = vi.hoisted(() => ({
@@ -92,7 +93,15 @@ function renderServiceLayout(
       <ChecklistMigrationProvider>
         <MemoryRouter initialEntries={initialEntries}>
           <Routes>
-            <Route element={<ServiceLayout />}>{routes}</Route>
+            <Route
+              element={
+                <ServiceLayout>
+                  <Outlet />
+                </ServiceLayout>
+              }
+            >
+              {routes}
+            </Route>
           </Routes>
         </MemoryRouter>
       </ChecklistMigrationProvider>

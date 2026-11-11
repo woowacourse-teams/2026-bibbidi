@@ -1,4 +1,3 @@
-import bibidiLogo from "../../assets/bibbidi-logo.webp";
 import "./BibidiBrand.css";
 
 export function BibidiBrand() {
@@ -9,7 +8,7 @@ export function BibidiBrand() {
           alt=""
           className="bibidi-brand__logo"
           draggable={false}
-          src={bibidiLogo}
+          src="/brand/bibbidi-logo.webp"
         />
       </span>
       <span className="bibidi-brand__name">bibbidi</span>

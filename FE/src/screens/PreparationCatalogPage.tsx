@@ -1,6 +1,6 @@
 import { PreparationRoadmapFeature } from "../features/preparation";
 import { PageContainer } from "../components/page-container";
-import { useSearchParams } from "react-router";
+import { useSearchParams } from "../app/navigation/navigation";
 import "./PreparationCatalogPage.css";
 
 export function PreparationCatalogPage() {

@@ -5,7 +5,12 @@ import {
   waitFor,
   act,
 } from "@testing-library/react";
-import { createMemoryRouter, Link, RouterProvider } from "react-router";
+import {
+  createMemoryRouter,
+  Link,
+  Outlet,
+  RouterProvider,
+} from "../../../test/memoryNavigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginModalLayout, LegacyLoginRedirect } from "./LoginModal";
 import { useLoginModal } from "../../auth/useLoginModal";
@@ -37,7 +42,7 @@ vi.mock("../api/socialLogin", async (importOriginal) => ({
   completeSocialLogin: vi.fn(),
 }));
 import { completeSocialLogin } from "../api/socialLogin";
-import { SocialLoginCallbackPage } from "../../../pages/SocialLoginCallbackPage";
+import { TestSocialLoginCallbackPage } from "../../../test/productRoutes";
 import { resetWebAuthSessionForTest } from "../../../infrastructure/auth/webSessionManager";
 
 beforeEach(() => {
@@ -65,10 +70,14 @@ function mount(entry = "/preparation?categoryId=20") {
   const router = createMemoryRouter(
     [
       {
-        Component: LoginModalLayout,
+        element: (
+          <LoginModalLayout>
+            <Outlet />
+          </LoginModalLayout>
+        ),
         children: [
           { path: "/login", Component: LegacyLoginRedirect },
-          { path: "/auth/:provider", Component: SocialLoginCallbackPage },
+          { path: "/auth/:provider", Component: TestSocialLoginCallbackPage },
           { path: "/preparation", Component: Background },
           { path: "/calendar", Component: Background },
           { path: "/landing", Component: Background },

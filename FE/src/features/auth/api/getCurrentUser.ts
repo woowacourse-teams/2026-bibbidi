@@ -1,7 +1,10 @@
 import { CurrentUser } from "../model/auth";
 import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFetch";
 
-const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
+const apiBaseUrl = (process.env.NEXT_PUBLIC_BIBBIDI_API_BASE_URL ?? "").replace(
+  /\/+$/,
+  "",
+);
 const CURRENT_USER_ENDPOINT = `${apiBaseUrl}/api/users/me`;
 const CURRENT_USER_TIMEOUT_MS = 10_000;
 

@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MemoryRouter } from "react-router";
+import { MemoryRouter } from "../../../test/memoryNavigation";
 
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../../shared/responsive";
 import { installMatchMedia } from "../../../test/matchMedia";

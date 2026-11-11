@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router";
+import { Link, useLocation } from "../app/navigation/navigation";
 import type { ReactNode } from "react";
 
 import "./AppBottomNavigation.css";

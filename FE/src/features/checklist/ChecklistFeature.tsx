@@ -1,6 +1,11 @@
 import { useLoginModal } from "../auth/useLoginModal";
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router";
+import {
+  useLocation,
+  useNavigate,
+  useSearchParams,
+  type EntryState,
+} from "../../app/navigation/navigation";
 
 import { analytics } from "../../infrastructure/analytics";
 import { useIsMobileLayout } from "../../shared/responsive";
@@ -90,7 +95,7 @@ function getChecklistDetailDepth(state: unknown) {
   return Number.isInteger(depth) && Number(depth) > 0 ? Number(depth) : null;
 }
 
-function createChecklistDetailState(state: unknown, depth: number) {
+function createChecklistDetailState(state: EntryState | null, depth: number) {
   return {
     ...(typeof state === "object" && state !== null ? state : {}),
     [checklistDetailDepthStateKey]: depth,
@@ -433,7 +438,7 @@ export function ChecklistFeature({
   const updateTaskSelection = useCallback(
     (
       taskId: string | null,
-      options: { replace?: boolean; state?: unknown } = {},
+      options: { replace?: boolean; state?: EntryState | null } = {},
     ) => {
       setSearchParams((currentSearchParams) => {
         const nextSearchParams = new URLSearchParams(currentSearchParams);

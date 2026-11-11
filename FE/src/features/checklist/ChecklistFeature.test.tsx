@@ -8,7 +8,11 @@ import {
 } from "@testing-library/react";
 import { useSyncExternalStore } from "react";
 import type { ComponentProps } from "react";
-import { MemoryRouter, useLocation, useNavigate } from "react-router";
+import {
+  MemoryRouter,
+  useLocation,
+  useNavigate,
+} from "../../test/memoryNavigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";

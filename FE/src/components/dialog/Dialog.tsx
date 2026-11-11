@@ -1,3 +1,4 @@
+import { useHydrated } from "../../shared/browser/useHydrated";
 import { useId, useRef } from "react";
 import type { ComponentPropsWithoutRef, ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
@@ -72,8 +73,9 @@ function Root({
   const actionsRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+  const hydrated = useHydrated();
   useNativeModalLifecycle({
-    open,
+    open: hydrated && open,
     priority: 2,
     dialogRef,
     surfaceRef,
@@ -120,7 +122,7 @@ function Root({
     onPointerCancel,
     onClick,
   });
-  if (typeof document === "undefined") return null;
+  if (!hydrated) return null;
   return createPortal(
     <dialog
       tabIndex={-1}

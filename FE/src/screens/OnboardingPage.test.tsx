@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes } from "../test/memoryNavigation";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   rememberLoginReturnPath,

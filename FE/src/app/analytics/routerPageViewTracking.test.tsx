@@ -5,7 +5,7 @@ import {
   Navigate,
   RouterProvider,
   type RouteObject,
-} from "react-router";
+} from "../../test/memoryNavigation";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AnalyticsClient } from "../../infrastructure/analytics";

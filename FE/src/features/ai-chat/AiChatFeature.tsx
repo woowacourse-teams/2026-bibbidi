@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState } from "react";
-import { useLinkClickHandler } from "react-router";
+import { useLinkClickHandler } from "../../app/navigation/navigation";
 
 import { PageContainer } from "../../components/page-container";
 import { Button } from "../../components/button";

@@ -8,16 +8,17 @@ import {
 } from "@testing-library/react";
 import {
   MemoryRouter,
+  Outlet,
   Route,
   Routes,
   useLocation,
   useNavigate,
-} from "react-router";
+} from "../../test/memoryNavigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MyChecklistProvider } from "../checklist";
 import { ServiceLayout } from "../../layouts/ServiceLayout";
-import { AiChatPage } from "../../pages/AiChatPage";
+import { AiChatPage } from "../../screens/AiChatPage";
 import { preparationCatalogFixture } from "../preparation/test/fixtures/preparationCatalog.fixture";
 import { resetWebAuthSessionForTest } from "../../infrastructure/auth/webSessionManager";
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
@@ -84,7 +85,13 @@ function app(initial = "/preparation") {
     <MyChecklistProvider sessionKey="ai-tabs">
       <MemoryRouter initialEntries={[initial]}>
         <Routes>
-          <Route element={<ServiceLayout />}>
+          <Route
+            element={
+              <ServiceLayout>
+                <Outlet />
+              </ServiceLayout>
+            }
+          >
             <Route path="/preparation" element={<h1>로드맵 화면</h1>} />
             <Route path="/checklist" element={<h1>체크리스트 화면</h1>} />
             <Route path="/calendar" element={<h1>캘린더 화면</h1>} />

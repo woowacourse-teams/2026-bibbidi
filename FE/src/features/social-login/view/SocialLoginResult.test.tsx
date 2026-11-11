@@ -6,7 +6,7 @@ import {
   useNavigate,
   useLocation,
   useParams,
-} from "react-router";
+} from "../../../test/memoryNavigation";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const authMocks = vi.hoisted(() => ({

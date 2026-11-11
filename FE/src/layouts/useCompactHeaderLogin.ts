@@ -5,22 +5,23 @@ const COMPACT_SCROLL_OFFSET = 48;
 const SCROLL_DIRECTION_THRESHOLD = 12;
 
 function createCompactHeaderStore(container: HTMLElement | null | undefined) {
-  const ownerDocument = container?.ownerDocument ?? document;
-  const target =
-    !container || container === ownerDocument.documentElement
-      ? ownerDocument
-      : container;
-  const scrollRoot =
-    container ??
-    ownerDocument.scrollingElement ??
-    ownerDocument.documentElement;
-  const readScrollTop = () => Math.max(0, scrollRoot.scrollTop);
-  let previousScrollTop = readScrollTop();
-  let compact = previousScrollTop > COMPACT_SCROLL_OFFSET;
+  let compact = false;
 
   return {
     getSnapshot: () => compact,
     subscribe: (onChange: () => void) => {
+      const ownerDocument = container?.ownerDocument ?? document;
+      const target =
+        !container || container === ownerDocument.documentElement
+          ? ownerDocument
+          : container;
+      const scrollRoot =
+        container ??
+        ownerDocument.scrollingElement ??
+        ownerDocument.documentElement;
+      const readScrollTop = () => Math.max(0, scrollRoot.scrollTop);
+      let previousScrollTop = readScrollTop();
+      compact = previousScrollTop > COMPACT_SCROLL_OFFSET;
       const onScroll = () => {
         const scrollTop = readScrollTop();
         const delta = scrollTop - previousScrollTop;

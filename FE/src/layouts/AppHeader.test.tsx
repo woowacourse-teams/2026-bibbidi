@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter, useLocation } from "../test/memoryNavigation";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppBottomNavigation } from "./AppBottomNavigation";

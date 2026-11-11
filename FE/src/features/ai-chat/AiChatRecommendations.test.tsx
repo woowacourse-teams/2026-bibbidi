@@ -1,5 +1,5 @@
 import { MOBILE_LAYOUT_MEDIA_QUERY } from "../../shared/responsive";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter } from "../../test/memoryNavigation";
 import {
   act,
   cleanup,
