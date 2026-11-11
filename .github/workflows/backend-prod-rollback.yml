@@ -1,0 +1,99 @@
+name: 비비디 백엔드 운영 롤백·정리
+
+# 배포 뒤에도 트래픽 없이 남아 있는 이전 버전 컨테이너로 되돌리거나(rollback) 그 컨테이너를 지운다(cleanup).
+# 저장소를 체크아웃하지 않고 서버에 설치된 스크립트를 호출해 시작을 빠르게 한다.
+# 실행 ref는 backend-prod 환경의 배포 브랜치 제한(release-be)이 막고, 아래 확인 단계는 보조 장치다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "rollback: 트래픽을 받지 않는 이전 버전 컨테이너로 전환 / cleanup: 트래픽을 받지 않는 컨테이너 정지·삭제"
+        type: choice
+        required: true
+        options:
+          - rollback
+          - cleanup
+      cancel-running-deploy:
+        description: 운영 CD가 진행 중이거나 대기 중일 때만 선택. 해당 run을 먼저 취소한 뒤 실행
+        type: boolean
+        default: false
+      log-tail-lines:
+        description: 컨테이너를 지우기 전에 출력할 로그 줄 수 (0이면 출력 안 함, 로그에 사용자 데이터가 섞일 수 있음)
+        type: string
+        default: "0"
+
+permissions:
+  contents: read
+
+jobs:
+  cancel-running-deploy:
+    name: 진행 중인 운영 CD 취소
+    if: ${{ inputs.cancel-running-deploy }}
+    runs-on: ubuntu-24.04
+    environment: backend-prod
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: 운영 CD run 취소 요청
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # 강제 취소(force-cancel)는 배포 스크립트의 정리 단계를 건너뛰므로 쓰지 않는다.
+          # 일반 취소를 받은 스크립트가 이전 경로 복원과 새 컨테이너 정리를 마치면 prod 러너가 풀리고,
+          # 다음 잡이 그때 시작한다.
+          found=false
+          for status in in_progress queued waiting pending; do
+            for id in $(gh run list --workflow backend-prod-cd.yml --status "$status" --json databaseId --jq '.[].databaseId'); do
+              found=true
+              echo "취소 요청: run $id ($status)"
+              gh run cancel "$id"
+            done
+          done
+          if [ "$found" = false ]; then echo "취소할 운영 CD run이 없습니다."; fi
+
+  run:
+    name: 운영 ${{ inputs.action }}
+    needs: cancel-running-deploy
+    if: ${{ !cancelled() && (needs.cancel-running-deploy.result == 'success' || needs.cancel-running-deploy.result == 'skipped') }}
+    runs-on: ["self-hosted", "linux", "ARM64", "prod"]
+    environment: backend-prod
+    timeout-minutes: 10
+    env:
+      EC2_DEPLOY_PATH: /opt/bibbidi/app
+      NGINX_UPSTREAM_DIR: /opt/bibbidi/app/infra/nginx/upstream
+      HEALTHCHECK_TIMEOUT_SECONDS: "30"
+      PROXY_VERIFY_TIMEOUT_SECONDS: "30"
+      DRAIN_TIMEOUT_SECONDS: "90"
+    steps:
+      - name: 실행 ref 확인
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/release-be" ]; then
+            echo "::error title=실행 ref 거부::release-be 에서만 실행할 수 있습니다. 현재 ref: $GITHUB_REF"
+            exit 1
+          fi
+
+      - name: 서버에 설치된 스크립트 확인
+        run: test -x "$EC2_DEPLOY_PATH/infra/scripts/blue-green/main.sh"
+
+      - name: 시작 시각과 현재 상태 기록
+        run: |
+          echo "시작: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "활성 upstream: $(sed 's/#.*//' "$NGINX_UPSTREAM_DIR/active.conf" | tr -d '[:space:]')"
+          docker ps -a --filter name=bibbidi-backend --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+
+      - name: 운영 ${{ inputs.action }} 실행
+        env:
+          ACTION: ${{ inputs.action }}
+          CLEANUP_LOG_TAIL_LINES: ${{ inputs.log-tail-lines }}
+        run: bash "$EC2_DEPLOY_PATH/infra/scripts/blue-green/main.sh" "$ACTION"
+
+      - name: 완료 시각과 결과 상태 기록
+        if: always()
+        run: |
+          echo "종료: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "활성 upstream: $(sed 's/#.*//' "$NGINX_UPSTREAM_DIR/active.conf" | tr -d '[:space:]')"
+          docker ps -a --filter name=bibbidi-backend --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
