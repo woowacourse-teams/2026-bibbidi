@@ -80,10 +80,12 @@ PY
 install -m 0644 BE/compose.prod.yml "$app_dir/compose.yaml"
 install -m 0644 BE/compose.blue-green.yml "$app_dir/compose.blue-green.yml"
 install -m 0600 "$stage/.env.spring" "$SPRING_ENV_FILE"
-install -d -m 0755 "$app_dir/infra/scripts"
-install -m 0755 Infra/scripts/deploy-sub-tasks/deploy-blue-green.sh "$app_dir/infra/scripts/deploy-blue-green.sh"
+install -d -m 0755 "$app_dir/infra/scripts/blue-green"
+install -m 0755 Infra/scripts/deploy-sub-tasks/blue-green/*.sh "$app_dir/infra/scripts/blue-green/"
+# 옛 단일 스크립트는 blue-green/ 로 대체되어 서버에서 지운다.
+rm -f "$app_dir/infra/scripts/deploy-blue-green.sh"
 export BIBBIDI_BASE_COMPOSE_FILE="$app_dir/compose.yaml"
 
 # Keep the switch script's nonzero statuses, including manual recovery (30/40).
 # Never run a legacy fallback or stop a container here after a failed switch.
-bash "$app_dir/infra/scripts/deploy-blue-green.sh" "$target" "$IMAGE_TAG"
+bash "$app_dir/infra/scripts/blue-green/main.sh" deploy "$target" "$IMAGE_TAG"

@@ -77,7 +77,7 @@ jobs:
           fi
 
       - name: 서버에 설치된 스크립트 확인
-        run: test -x "$EC2_DEPLOY_PATH/infra/scripts/deploy-blue-green.sh"
+        run: test -x "$EC2_DEPLOY_PATH/infra/scripts/blue-green/main.sh"
 
       - name: 시작 시각과 현재 상태 기록
         run: |
@@ -89,7 +89,7 @@ jobs:
         env:
           ACTION: ${{ inputs.action }}
           CLEANUP_LOG_TAIL_LINES: ${{ inputs.log-tail-lines }}
-        run: bash "$EC2_DEPLOY_PATH/infra/scripts/deploy-blue-green.sh" "$ACTION"
+        run: bash "$EC2_DEPLOY_PATH/infra/scripts/blue-green/main.sh" "$ACTION"
 
       - name: 완료 시각과 결과 상태 기록
         if: always()
