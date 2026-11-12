@@ -2,53 +2,50 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 
 const distributionId = "E3TM3MDSJWPEW5";
-const serviceHost = "dev.bibbidi.kr";
-const serviceUrl = `https://${serviceHost}`;
-const originId = "bibbidi-next-dev-release";
-const originDomain = "techcourse-project-2026.s3.ap-northeast-2.amazonaws.com";
-const releaseRoot = "/bibbidi/fe/development/releases/";
-const releaseIdPattern =
-  /^[0-9a-f]{40}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const serviceUrl = "https://dev.bibbidi.kr";
+const bucket = "techcourse-project-2026";
+const prefix = "bibbidi/fe/development";
+const activeUri = `s3://${bucket}/${prefix}`;
+const revalidate = "public,max-age=0,must-revalidate";
 
-function aws(args, timeout = 30_000) {
-  const command = args.slice(0, args[0] === "wait" ? 2 : 1).join(" ");
-  const result = spawnSync(
-    "aws",
-    ["cloudfront", ...args, "--output", "json", "--no-cli-pager"],
-    { encoding: "utf8", timeout, stdio: ["ignore", "pipe", "inherit"] },
-  );
-  if (result.error) {
-    throw new Error(`CloudFront ${command} failed: ${result.error.message}`);
-  }
+function aws(args) {
+  const result = spawnSync("aws", [...args, "--no-cli-pager"], {
+    encoding: "utf8",
+    timeout: 180_000,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(
-      `CloudFront ${command} exited with status ${result.status}.`,
+      `AWS ${args.slice(0, 2).join(" ")} failed (${result.status}).`,
     );
   }
-  return result.stdout ? JSON.parse(result.stdout) : undefined;
+  return result.stdout.trim();
 }
 
-async function verifyDeployment(releaseId, calendarHash) {
+async function verifyDeployment(releaseId, hashes) {
   const options = { redirect: "error", signal: AbortSignal.timeout(10_000) };
-  const [version, calendar] = await Promise.all([
-    fetch(`${serviceUrl}/version.json`, options),
-    fetch(`${serviceUrl}/calendar/index.txt`, options),
-  ]);
+  const version = await fetch(`${serviceUrl}/version.json`, options);
   if (!version.ok || (await version.json()).releaseId !== releaseId) {
     throw new Error(
       "The public version.json does not match the staged release.",
     );
   }
-  if (
-    !calendar.ok ||
-    calendar.headers.get("content-type")?.split(";")[0] !== "text/plain" ||
-    createHash("sha256")
-      .update(Buffer.from(await calendar.arrayBuffer()))
-      .digest("hex") !== calendarHash
-  ) {
-    throw new Error("The public calendar navigation payload is invalid.");
+  for (const [path, expectedHash] of Object.entries(hashes)) {
+    const response = await fetch(`${serviceUrl}/${path}`, options);
+    const type = path.endsWith(".txt") ? "text/plain" : "text/html";
+    if (
+      !response.ok ||
+      response.headers.get("content-type")?.split(";")[0] !== type ||
+      createHash("sha256")
+        .update(Buffer.from(await response.arrayBuffer()))
+        .digest("hex") !== expectedHash
+    ) {
+      throw new Error(`The public ${path} does not match the staged release.`);
+    }
   }
 }
 
@@ -57,99 +54,132 @@ async function activate(manifestFile) {
   if (
     env.CLOUDFRONT_DISTRIBUTION_ID !== distributionId ||
     env.FE_SERVICE_URL?.replace(/\/$/, "") !== serviceUrl ||
-    env.S3_BUCKET_NAME !== "techcourse-project-2026" ||
-    env.S3_PREFIX !== "bibbidi/fe/development"
+    env.S3_BUCKET_NAME !== bucket ||
+    env.S3_PREFIX !== prefix
   ) {
-    throw new Error("Release activation is restricted to Bibbidi development.");
+    throw new Error(
+      "Release publication is restricted to Bibbidi development.",
+    );
   }
 
-  const { releaseId, commit, buildId, files } = JSON.parse(
-    await readFile(manifestFile, "utf8"),
-  );
-  const calendarHash = files?.find(
-    (file) => file.path === "calendar/index.txt",
-  )?.sha256;
+  const manifest = JSON.parse(await readFile(manifestFile, "utf8"));
+  const { releaseId, commit, buildId, files } = manifest;
   if (
-    !releaseIdPattern.test(releaseId) ||
-    !/^[0-9a-f]{64}$/.test(calendarHash) ||
+    !/^[0-9a-f]{40}$/i.test(commit) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      buildId?.split(":").at(-1),
+    ) ||
     commit !== env.CODEBUILD_RESOLVED_SOURCE_VERSION ||
     buildId !== env.CODEBUILD_BUILD_ID ||
-    releaseId !== `${commit}-${buildId?.split(":").at(-1)}`
+    releaseId !== `${commit}-${buildId.split(":").at(-1)}`
   ) {
     throw new Error(
       "Staged release metadata does not match this CodeBuild run.",
     );
   }
-
-  const target = ["--id", distributionId];
-  const { ETag, Distribution } = aws(["get-distribution", ...target]);
-  const config = Distribution.DistributionConfig;
-  const origin = config.Origins.Items.find((item) => item.Id === originId);
-  const aliases = config.Aliases.Items;
-  const previousPath = origin?.OriginPath;
-  if (
-    Distribution.Status !== "Deployed" ||
-    !ETag ||
-    aliases?.length !== 1 ||
-    aliases[0] !== serviceHost ||
-    config.DefaultCacheBehavior.TargetOriginId !== originId ||
-    origin?.DomainName !== originDomain ||
-    !previousPath?.startsWith(releaseRoot) ||
-    !releaseIdPattern.test(previousPath.slice(releaseRoot.length))
-  ) {
-    throw new Error(
-      "The development distribution is not ready for release activation.",
-    );
+  const hashes = {};
+  for (const path of ["index.html", "calendar/index.txt"]) {
+    const hash = files?.find((file) => file.path === path)?.sha256;
+    if (!/^[0-9a-f]{64}$/.test(hash)) {
+      throw new Error(`Missing staged hash for ${path}.`);
+    }
+    const data = await readFile(join("FE/out", path));
+    if (createHash("sha256").update(data).digest("hex") !== hash) {
+      throw new Error(`Local ${path} differs from the staged release.`);
+    }
+    hashes[path] = hash;
   }
 
-  const nextPath = releaseRoot + releaseId;
-  console.log(`Development origin path: ${previousPath} -> ${nextPath}`);
-  if (previousPath !== nextPath) {
-    origin.OriginPath = nextPath;
-    const configFile = join(
-      dirname(manifestFile),
-      "cloudfront-distribution.json",
-    );
-    await writeFile(configFile, JSON.stringify(config), { mode: 0o600 });
-    // Match the version we read so a concurrent configuration edit is preserved.
-    aws([
-      "update-distribution",
-      ...target,
-      "--if-match",
-      ETag,
-      "--distribution-config",
-      `file://${configFile}`,
-    ]);
+  const previous = await fetch(`${serviceUrl}/version.json`, {
+    redirect: "error",
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!previous.ok) throw new Error("Could not record the current release.");
+  const previousRelease = (await previous.json()).releaseId;
+  if (!/^[0-9a-f]{40}-[0-9a-f-]{36}$/i.test(previousRelease)) {
+    throw new Error("The current public release ID is invalid.");
   }
+  console.log(
+    `Previous release archive: ${activeUri}/releases/${previousRelease}/`,
+  );
 
   try {
-    aws(["wait", "distribution-deployed", ...target], 240_000);
-    const distribution = ["--distribution-id", distributionId];
-    const { Invalidation } = aws([
+    // Keep previous hashed assets so tabs opened before deployment can load them.
+    const copy = [
+      "s3",
+      "cp",
+      "FE/out/",
+      activeUri + "/",
+      "--recursive",
+      "--only-show-errors",
+    ];
+    aws([
+      ...copy,
+      "--cache-control",
+      "public,max-age=31536000,immutable",
+      "--exclude",
+      "*",
+      "--include",
+      "_next/static/*",
+    ]);
+    aws([
+      ...copy,
+      "--cache-control",
+      revalidate,
+      "--exclude",
+      "_next/static/*",
+    ]);
+    const metadata = [
+      "s3",
+      "cp",
+      "--cache-control",
+      revalidate,
+      "--content-type",
+      "application/json",
+      "--only-show-errors",
+    ];
+    aws([...metadata, manifestFile, activeUri + "/release-manifest.json"]);
+    const versionFile = join(dirname(manifestFile), "version.json");
+    await writeFile(
+      versionFile,
+      JSON.stringify({ releaseId, commit, buildId }) + "\n",
+    );
+    // Publish the version marker only after the complete export has been uploaded.
+    aws([...metadata, versionFile, activeUri + "/version.json"]);
+    const invalidationId = aws([
+      "cloudfront",
       "create-invalidation",
-      ...distribution,
+      "--distribution-id",
+      distributionId,
       "--paths",
       "/*",
+      "--query",
+      "Invalidation.Id",
+      "--output",
+      "text",
     ]);
-    aws(
-      [
-        "wait",
-        "invalidation-completed",
-        ...distribution,
-        "--id",
-        Invalidation.Id,
-      ],
-      120_000,
-    );
-    console.log(`CloudFront invalidation ${Invalidation.Id} completed.`);
-    await verifyDeployment(releaseId, calendarHash);
+    console.log(`Requested CloudFront invalidation ${invalidationId}.`);
+
+    const deadline = Date.now() + 300_000;
+    let lastError;
+    while (Date.now() < deadline) {
+      try {
+        await verifyDeployment(releaseId, hashes);
+        console.log(`Verified development release ${releaseId}.`);
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+      console.log(`Waiting for public release: ${lastError.message}`);
+      await delay(Math.min(20_000, Math.max(0, deadline - Date.now())));
+    }
+    throw lastError;
   } catch (error) {
     throw new Error(
-      `Development release could not be verified: ${error.message} ` +
-        `Check CloudFront and restore the previous origin path if needed: ${previousPath}`,
+      `Development publication failed: ${error.message} ` +
+        `Previous release archive: ${activeUri}/releases/${previousRelease}/`,
     );
   }
-  console.log(`Verified development release ${releaseId}.`);
 }
 
 await activate(process.argv[2]);

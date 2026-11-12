@@ -47,6 +47,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Test development deployment
+        run: node --test infra/frontend/activate-release.test.mjs
+
       - name: Lint
         run: pnpm --filter bibbidi-fe lint
 
