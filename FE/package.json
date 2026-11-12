@@ -9,14 +9,14 @@
     "pnpm": ">=11 <12"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/next-with-catalog.mjs dev",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix --max-warnings 0",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build": "next build"
+    "build": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/next-with-catalog.mjs build"
   },
   "dependencies": {
     "@sentry/nextjs": "11.1.0",
@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@next/env": "16.4.6",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.3",
     "@types/react": "^19.2.18",

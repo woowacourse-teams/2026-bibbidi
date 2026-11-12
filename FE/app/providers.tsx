@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AppPageViewTracker } from "../src/app/analytics/AppPageViewTracker";
 import {
@@ -16,6 +17,7 @@ import { LoginModalLayout } from "../src/features/social-login/view/LoginModal";
 import { preventLinkDrag } from "../src/infrastructure/browser/preventLinkDrag";
 
 export function Providers({ children }: { children: ReactNode }) {
+  const pathname = normalizePathname(usePathname());
   const [timing] = useState(createNavigationTiming);
   const startNavigation = useCallback(
     (pathname: string) => timing.publish(pathname, false),
@@ -34,7 +36,9 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <NavigationProvider onNavigationStart={startNavigation}>
-      <AuthProvider>
+      <AuthProvider
+        keepChildrenOnError={pathname === "/" || pathname === "/preparation"}
+      >
         <ChecklistMigrationProvider>
           <AppPageViewTracker />
           <NavigationTracking timing={timing} />

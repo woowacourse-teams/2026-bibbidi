@@ -117,6 +117,7 @@ const ALLOWED_PROPERTIES = new Set([
   "page_load_id",
   "measurement_id",
   "measurement_version",
+  "timing_source",
   "navigation_kind",
   "duration_ms",
 ]);

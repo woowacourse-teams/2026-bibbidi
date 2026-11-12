@@ -18,7 +18,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["**/*.config.mjs"],
+    files: ["**/*.config.mjs", "scripts/**/*.mjs"],
     extends: [js.configs.recommended],
     languageOptions: { globals: globals.node },
   },

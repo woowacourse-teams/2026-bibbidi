@@ -1,3 +1,5 @@
+"use client";
+
 import {
   useCallback,
   useLayoutEffect,
@@ -11,6 +13,7 @@ import { AiChatSessionProvider } from "../features/ai-chat/AiChatSession";
 import { AppLayout } from "../components/app-layout";
 import { AppHeaderSummaryFeature } from "../features/app-header";
 import { useAuth, useLogout } from "../features/auth";
+import type { CatalogCategoryModel } from "../features/catalog";
 import { AppBottomNavigation } from "./AppBottomNavigation";
 import { AppHeader } from "./AppHeader";
 import "./ServiceLayout.css";
@@ -18,9 +21,11 @@ import { useIsMobileLayout } from "../shared/responsive";
 
 export function ServiceLayout({
   children,
+  catalogCategories,
   showNavigationDock = true,
 }: {
   children?: ReactNode;
+  catalogCategories?: CatalogCategoryModel[];
   showNavigationDock?: boolean;
 }) {
   const { authState, endAuthentication, refreshAuth } = useAuth();
@@ -75,7 +80,13 @@ export function ServiceLayout({
                     kind: "authenticated",
                     summary: (
                       <AppHeaderSummaryFeature
+                        key={authState.user.id}
                         navigationKey={pathname}
+                        catalogCategories={
+                          pathname === "/" || pathname === "/preparation"
+                            ? catalogCategories
+                            : undefined
+                        }
                         onAuthenticationRequired={refreshAuth}
                       />
                     ),
@@ -87,7 +98,12 @@ export function ServiceLayout({
                 : authState.status === "guest" ||
                     authState.status === "onboardingRequired"
                   ? { kind: "guest" }
-                  : { kind: "pending" }
+                  : {
+                      kind:
+                        authState.status === "error"
+                          ? "unavailable"
+                          : "pending",
+                    }
             }
           />
         </div>

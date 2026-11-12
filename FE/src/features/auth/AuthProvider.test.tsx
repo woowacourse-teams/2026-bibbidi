@@ -141,6 +141,20 @@ describe("AuthProvider", () => {
     expect(screen.queryByText("guest")).toBeNull();
   });
 
+  it("공개 화면은 인증 오류를 전달받고 콘텐츠를 유지한다", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("failed")));
+
+    render(
+      <AuthProvider keepChildrenOnError>
+        <h1>준비 목록</h1>
+        <AuthStateView />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("error")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "준비 목록" })).toBeTruthy();
+  });
+
   it("현재 사용자 응답으로 체크리스트 동기화 상태를 시작한다", async () => {
     vi.stubGlobal(
       "fetch",

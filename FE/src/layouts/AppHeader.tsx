@@ -21,18 +21,22 @@ interface GuestUser {
   kind: "guest";
 }
 
-interface PendingUser {
-  kind: "pending";
+interface UnauthenticatedStatus {
+  kind: "pending" | "unavailable";
 }
 
 interface AppHeaderProps {
-  user: AuthenticatedUser | GuestUser | PendingUser;
+  user: AuthenticatedUser | GuestUser | UnauthenticatedStatus;
 }
 
 export function AppHeader({ user }: AppHeaderProps) {
   const { pathname } = useLocation();
   const { loginTo, loginState, openLogin } = useLoginModal();
   const { ref, compact } = useCompactHeaderLogin();
+  const authStatusLabel =
+    user.kind === "unavailable"
+      ? "로그인 상태 확인 실패"
+      : "로그인 상태 확인 중";
   const actions = (
     <div className="app-header__actions" ref={ref}>
       {user.kind === "authenticated" ? (
@@ -66,12 +70,12 @@ export function AppHeader({ user }: AppHeaderProps) {
         </nav>
       ) : (
         <div
-          aria-label="로그인 상태 확인 중"
+          aria-label={authStatusLabel}
           className="app-header__auth-pending"
           role="status"
         >
           <span className="app-header__auth-pending-text">
-            로그인 상태 확인 중
+            {authStatusLabel}
           </span>
         </div>
       )}

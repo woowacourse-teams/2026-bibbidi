@@ -5,6 +5,7 @@ env:
   variables:
     S3_BUCKET_NAME: techcourse-project-2026
     S3_PREFIX: bibbidi/fe/development
+    BIBBIDI_CATALOG_API_ORIGIN: https://dev-api.bibbidi.kr
     NEXT_TELEMETRY_DISABLED: "1"
 
 phases:

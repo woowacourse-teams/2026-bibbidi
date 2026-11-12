@@ -1,4 +1,4 @@
-import { CatalogModel } from "../model/catalog";
+import type { CatalogModel } from "../model/catalog";
 
 interface CatalogItemResponse {
   displayOrder: number;
