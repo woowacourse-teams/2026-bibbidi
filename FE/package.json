@@ -1,6 +1,6 @@
 {
   "name": "bibbidi-fe",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Bibbidi frontend built with Next.js and TypeScript",
   "packageManager": "pnpm@11.20.0",

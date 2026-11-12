@@ -15,7 +15,7 @@ FE는 `FE/package.json`의 `version`을 기준으로 버전을 관리한다. 외
 - 변경 PR은 사용자에게 영향을 주는 내용과 PR 링크를 `FE/CHANGELOG.md`의 `Unreleased`에 추가한다.
 - 기준 버전을 올릴 때 `FE/package.json`과 `FE/CHANGELOG.md`를 한 PR에서 수정하고, `Unreleased`의 릴리스 대상 항목을 새 버전 제목 아래로 옮긴다. 배포 스크립트는 기준 버전 형식과 해당 버전 제목을 검사한다.
 - `dev-fe`의 CodeBuild는 개발 빌드마다 `0.1.0-dev.123` 같은 사전 릴리스 버전을 붙인다. `123`은 CodeBuild의 빌드 번호이며, 같은 커밋을 다시 빌드해도 빌드 번호는 달라진다.
-- 운영 안정 릴리스에는 검증한 소스 커밋의 `fe/vX.Y.Z` 태그와 GitHub Release를 연결한다. 기존 태그는 보존한다. 이 단계는 운영 FE 릴리스 절차에 적용한다.
+- 운영 안정 릴리스에는 검증한 소스 커밋의 `fe/vX.Y.Z` 태그와 GitHub Release를 연결한다. 기존 태그는 보존한다. [운영 전환 및 복구 절차](production-static-release.md)에 따라 공개 버전 확인을 마친 뒤 태그와 GitHub Release를 게시한다.
 
 ## 현재 개발 배포 확인
 
@@ -27,4 +27,4 @@ FE는 `FE/package.json`의 `version`을 기준으로 버전을 관리한다. 외
 2. 개발 파이프라인에 진행 중이거나 대기 중인 배포가 없는 시간에 복구한다. 보관본을 다운로드해 manifest의 파일 목록과 SHA-256을 확인한다. 보관본의 전체 export를 `s3://techcourse-project-2026/bibbidi/fe/development/`에 복사한다. 기존 해시 에셋과 다른 릴리스 보관본을 보존하고 원본 객체의 캐시·콘텐츠 유형 메타데이터를 유지한다. `release-manifest.json`과 `version.json`은 export가 올라간 후 순서대로 복사한다.
 3. 개발 CloudFront 배포 `E3TM3MDSJWPEW5`의 `/*` 캐시 무효화를 요청한다. 공개 `/version.json`이 복구 대상의 정보를 반환하는지, `/index.html`과 `/calendar/index.txt`의 해시가 복구 manifest와 일치하는지 확인한다. 브라우저에서 홈과 캘린더 이동도 확인한다. 수행 시각, 복구 전후 릴리스, 검증 결과를 이슈에 남긴다.
 
-고정 경로에 파일을 복사하는 동안에는 서로 다른 릴리스의 파일이 잠시 제공될 수 있다. 복구 과정에서 다른 배포가 겹치면 공개 버전과 파일을 다시 대조한다. 운영 배포의 안정 버전 확정과 복구 절차 적용은 운영 전환에 포함한다.
+고정 경로에 파일을 복사하는 동안에는 서로 다른 릴리스의 파일이 잠시 제공될 수 있다. 복구 과정에서 다른 배포가 겹치면 공개 버전과 파일을 다시 대조한다. 운영의 현재 버전은 [운영 `/version.json`](https://bibbidi.kr/version.json)에서 확인한다. 최초 전환 전에는 기존 배포의 커밋과 빌드 ID가 표시된다.

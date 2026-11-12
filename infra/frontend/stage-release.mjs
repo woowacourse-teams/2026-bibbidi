@@ -4,12 +4,22 @@ import { createReadStream } from "node:fs";
 import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readDevelopmentVersion } from "./development-version.mjs";
+import { readReleaseVersion } from "./release-version.mjs";
 
 const exportDir = "FE/out";
-const stagedManifestFile = process.argv[2];
-const developmentReleaseRoot =
-  "s3://techcourse-project-2026/bibbidi/fe/development/releases";
+const [argument, ...extraArguments] = process.argv.slice(2);
+if (
+  extraArguments.length ||
+  (argument?.startsWith("--") && argument !== "--production")
+) {
+  throw new Error(
+    "Usage: node stage-release.mjs [manifest-path | --production]",
+  );
+}
+const production = argument === "--production";
+const stagedManifestFile = production ? undefined : argument;
+const environment = production ? "production" : "development";
+const releaseRoot = `s3://techcourse-project-2026/bibbidi/fe/${environment}/releases`;
 const revalidate = "public,max-age=0,must-revalidate";
 const immutable = "public,max-age=31536000,immutable";
 
@@ -57,7 +67,7 @@ function upload(source, target, cacheControl, ...options) {
   if (result.status !== 0) throw new Error(`S3 upload failed: ${target}`);
 }
 
-const version = await readDevelopmentVersion();
+const version = await readReleaseVersion({ production });
 
 const paths = (await listFiles(exportDir)).sort();
 for (const path of [
@@ -79,7 +89,7 @@ if (paths.includes("version.json") || paths.includes("release-manifest.json")) {
   throw new Error("The export contains a reserved release metadata file.");
 }
 
-const releaseUri = `${developmentReleaseRoot}/${version.releaseId}`;
+const releaseUri = `${releaseRoot}/${version.releaseId}`;
 const files = [];
 for (const path of paths) files.push(await describeFile(path));
 

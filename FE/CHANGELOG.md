@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-- 개발 배포 정보에 FE 시맨틱 버전과 변경 내역 링크를 표시합니다. [#831](https://github.com/woowacourse-teams/2026-bibbidi/issues/831)
+## 1.0.0
+
+- 운영 프런트엔드를 Webpack 기반 CSR에서 Next.js 정적 빌드로 전환합니다. 홈과 준비 목록의 공개 카탈로그는 HTML에 담고, 개인 데이터는 접속 후 가져옵니다. [#822](https://github.com/woowacourse-teams/2026-bibbidi/pull/822) [#825](https://github.com/woowacourse-teams/2026-bibbidi/pull/825)
+- 개발과 운영 배포의 `version.json`에 버전, 커밋, 변경 내역 링크를 기록합니다. 운영에서는 릴리스별로 정적 파일을 보관해 이전 버전으로 돌아갈 수 있습니다. [#832](https://github.com/woowacourse-teams/2026-bibbidi/pull/832) [#833](https://github.com/woowacourse-teams/2026-bibbidi/issues/833)
 
 ## 0.1.0
 

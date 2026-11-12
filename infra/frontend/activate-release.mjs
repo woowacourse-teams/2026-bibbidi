@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { readDevelopmentVersion } from "./development-version.mjs";
+import { readReleaseVersion } from "./release-version.mjs";
 
 const distributionId = "E3TM3MDSJWPEW5";
 const serviceUrl = "https://dev.bibbidi.kr";
@@ -71,7 +71,7 @@ async function activate(manifestFile) {
   }
 
   const manifest = JSON.parse(await readFile(manifestFile, "utf8"));
-  const version = await readDevelopmentVersion();
+  const version = await readReleaseVersion();
   if (!matchesVersion(manifest, version)) {
     throw new Error(
       "Staged release metadata does not match this CodeBuild run.",

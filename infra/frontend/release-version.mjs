@@ -4,7 +4,7 @@ const stableVersion = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const buildUuid =
   /:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 
-export async function readDevelopmentVersion() {
+export async function readReleaseVersion({ production = false } = {}) {
   const commit = process.env.CODEBUILD_RESOLVED_SOURCE_VERSION ?? "";
   const buildId = process.env.CODEBUILD_BUILD_ID ?? "";
   const buildNumber = process.env.CODEBUILD_BUILD_NUMBER ?? "";
@@ -12,6 +12,7 @@ export async function readDevelopmentVersion() {
   if (
     !/^[0-9a-f]{40}$/i.test(commit) ||
     !uuid ||
+    (production && !buildId.startsWith("bibbidi-fe-production-build:")) ||
     !/^[1-9][0-9]*$/.test(buildNumber)
   ) {
     throw new Error(
@@ -36,7 +37,7 @@ export async function readDevelopmentVersion() {
   }
 
   return {
-    version: `${baseVersion}-dev.${buildNumber}`,
+    version: production ? baseVersion : `${baseVersion}-dev.${buildNumber}`,
     commit,
     buildId,
     releaseId: `${commit}-${uuid}`,
