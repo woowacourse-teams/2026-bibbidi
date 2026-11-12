@@ -19,6 +19,8 @@ const commit = "a".repeat(40);
 const uuid = "12345678-1234-1234-1234-123456789abc";
 const releaseId = commit + "-" + uuid;
 const previousRelease = "b".repeat(40) + "-" + uuid;
+const version = "0.1.0-dev.123";
+const changelogUrl = `https://github.com/woowacourse-teams/2026-bibbidi/blob/${commit}/FE/CHANGELOG.md`;
 const contents = {
   "index.html": "<h1>Public catalog</h1>",
   "404.html": "<h1>Not found</h1>",
@@ -32,9 +34,11 @@ function fixture(run) {
   const manifestFile = join(directory, "release-manifest.json");
   const log = join(directory, "calls.jsonl");
   const manifest = {
+    version,
     releaseId,
     commit,
     buildId: "bibbidi-fe-development-build:" + uuid,
+    changelogUrl,
     files: Object.entries(contents).map(([path, text]) => ({
       path,
       bytes: Buffer.byteLength(text),
@@ -46,6 +50,14 @@ function fixture(run) {
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, text);
   }
+  writeFileSync(
+    join(directory, "FE/package.json"),
+    JSON.stringify({ version: "0.1.0" }),
+  );
+  writeFileSync(
+    join(directory, "FE/CHANGELOG.md"),
+    "# 변경 내역\n\n## 0.1.0\n",
+  );
   writeFileSync(manifestFile, JSON.stringify(manifest));
   writeFileSync(
     join(directory, "aws"),
@@ -82,7 +94,11 @@ globalThis.fetch = async url => {
     if (initial) return Response.json({releaseId: ${JSON.stringify(previousRelease)}});
     if (process.env.MOCK_SCENARIO === "transient" && versionRequests === 2) return new Response("retry", {status: 503});
     const actualId = process.env.MOCK_SCENARIO === "stale" ? ${JSON.stringify(previousRelease)} : manifest.releaseId;
-    return Response.json({releaseId: actualId});
+    return Response.json({
+      ...manifest,
+      releaseId: actualId,
+      version: process.env.MOCK_SCENARIO === "wrong-version" ? "0.1.0-dev.122" : manifest.version,
+    });
   }
   const type = path.endsWith(".txt") ? "text/plain" : "text/html";
   const wrong = process.env.MOCK_SCENARIO === "wrong-payload" || (process.env.MOCK_SCENARIO === "wrong-calendar" && path === "/calendar/index.txt");
@@ -108,6 +124,7 @@ globalThis.fetch = async url => {
           CLOUDFRONT_DISTRIBUTION_ID: "E3TM3MDSJWPEW5",
           CODEBUILD_RESOLVED_SOURCE_VERSION: commit,
           CODEBUILD_BUILD_ID: manifest.buildId,
+          CODEBUILD_BUILD_NUMBER: "123",
           MOCK_LOG: log,
           ...overrides,
         },
@@ -157,6 +174,8 @@ test("publishes the complete export and polls public responses using existing pe
       ),
     );
     assert.equal(commands[3].metadata.releaseId, releaseId);
+    assert.equal(commands[3].metadata.version, version);
+    assert.equal(commands[3].metadata.changelogUrl, changelogUrl);
     assert(commands[4].args.includes("E3TM3MDSJWPEW5"));
     assert(commands[4].args.includes("/*"));
     assert(
@@ -177,7 +196,12 @@ test("retries temporary CDN failures", () =>
   }));
 
 test("fails on stale versions and payloads even when HTTP responses succeed", () => {
-  for (const scenario of ["stale", "wrong-payload", "wrong-calendar"]) {
+  for (const scenario of [
+    "stale",
+    "wrong-version",
+    "wrong-payload",
+    "wrong-calendar",
+  ]) {
     fixture(({ execute }) => {
       const result = execute("activate-release.mjs", {
         MOCK_SCENARIO: scenario,
@@ -204,9 +228,45 @@ test("rejects production and mismatched build metadata before accessing AWS", ()
     { S3_PREFIX: "bibbidi/fe/production" },
     { FE_SERVICE_URL: "https://bibbidi.kr" },
     { CODEBUILD_RESOLVED_SOURCE_VERSION: "c".repeat(40) },
+    { CODEBUILD_BUILD_NUMBER: "124" },
   ]) {
     fixture(({ execute }) => {
       const result = execute("activate-release.mjs", overrides);
+      assert.notEqual(result.status, 0);
+      assert.deepEqual(result.calls, []);
+    });
+  }
+});
+
+test("carries the staged SemVer and changelog through to the active version marker", () =>
+  fixture(({ execute, manifestFile }) => {
+    rmSync(manifestFile);
+    const staged = execute("stage-release.mjs");
+    assert.equal(staged.status, 0, staged.stderr);
+    const { files, ...metadata } = JSON.parse(
+      readFileSync(manifestFile, "utf8"),
+    );
+    assert.equal(metadata.version, version);
+    assert.equal(metadata.changelogUrl, changelogUrl);
+    assert.deepEqual(staged.calls[2].metadata, metadata);
+    assert.deepEqual(staged.calls[3].metadata, { ...metadata, files });
+
+    const activated = execute();
+    assert.equal(activated.status, 0, activated.stderr);
+    assert.deepEqual(
+      activated.calls.filter((call) => call.args)[3].metadata,
+      metadata,
+    );
+  }));
+
+test("rejects an invalid base version or a missing changelog entry before uploading", () => {
+  for (const baseVersion of ["0.01.0", "0.2.0"]) {
+    fixture(({ execute, directory }) => {
+      writeFileSync(
+        join(directory, "FE/package.json"),
+        JSON.stringify({ version: baseVersion }),
+      );
+      const result = execute("stage-release.mjs");
       assert.notEqual(result.status, 0);
       assert.deepEqual(result.calls, []);
     });

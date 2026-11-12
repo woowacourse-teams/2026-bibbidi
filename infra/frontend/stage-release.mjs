@@ -4,6 +4,7 @@ import { createReadStream } from "node:fs";
 import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { readDevelopmentVersion } from "./development-version.mjs";
 
 const exportDir = "FE/out";
 const stagedManifestFile = process.argv[2];
@@ -56,14 +57,7 @@ function upload(source, target, cacheControl, ...options) {
   if (result.status !== 0) throw new Error(`S3 upload failed: ${target}`);
 }
 
-const commit = process.env.CODEBUILD_RESOLVED_SOURCE_VERSION ?? "";
-const buildId = process.env.CODEBUILD_BUILD_ID ?? "";
-const uuid = buildId.match(
-  /:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
-)?.[1];
-if (!/^[0-9a-f]{40}$/i.test(commit) || !uuid) {
-  throw new Error("A resolved Git commit and a CodeBuild run ID are required.");
-}
+const version = await readDevelopmentVersion();
 
 const paths = (await listFiles(exportDir)).sort();
 for (const path of [
@@ -85,9 +79,7 @@ if (paths.includes("version.json") || paths.includes("release-manifest.json")) {
   throw new Error("The export contains a reserved release metadata file.");
 }
 
-const releaseId = `${commit}-${uuid}`;
-const releaseUri = `${developmentReleaseRoot}/${releaseId}`;
-const version = { releaseId, commit, buildId };
+const releaseUri = `${developmentReleaseRoot}/${version.releaseId}`;
 const files = [];
 for (const path of paths) files.push(await describeFile(path));
 
@@ -137,7 +129,9 @@ try {
       flag: "wx",
     });
   }
-  console.log(`Staged ${paths.length} files at ${releaseUri}/`);
+  console.log(
+    `Staged ${version.version} (${paths.length} files) at ${releaseUri}/`,
+  );
 } finally {
   await rm(metadataDir, { recursive: true, force: true });
 }

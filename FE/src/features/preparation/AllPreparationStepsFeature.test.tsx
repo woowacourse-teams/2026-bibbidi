@@ -660,11 +660,11 @@ describe("단일 준비 로드맵", () => {
   it("StrictMode 최초 진입은 한 번 기록하고 카테고리·단계 선택을 기록한다", async () => {
     render(<StrictMode>{ui()}</StrictMode>);
     await screen.findByRole("heading", { name: "웨딩홀" });
-    expect(
+    const catalogViewCalls = () =>
       mocks.track.mock.calls.filter(
-        ([e]) => e.name === "preparation_catalog_view",
-      ),
-    ).toHaveLength(1);
+        ([event]) => event.name === "preparation_catalog_view",
+      );
+    await waitFor(() => expect(catalogViewCalls()).toHaveLength(1));
     await openFirst();
     expect(mocks.track).toHaveBeenCalledWith(
       expect.objectContaining({ name: "preparation_step_select" }),
@@ -674,5 +674,6 @@ describe("단일 준비 로드맵", () => {
     expect(mocks.track).toHaveBeenCalledWith(
       expect.objectContaining({ name: "preparation_category_select" }),
     );
+    expect(catalogViewCalls()).toHaveLength(1);
   });
 });

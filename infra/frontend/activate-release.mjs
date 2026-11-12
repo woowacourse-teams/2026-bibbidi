@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { readDevelopmentVersion } from "./development-version.mjs";
 
 const distributionId = "E3TM3MDSJWPEW5";
 const serviceUrl = "https://dev.bibbidi.kr";
@@ -26,10 +27,11 @@ function aws(args) {
   return result.stdout.trim();
 }
 
-async function verifyDeployment(releaseId, hashes) {
+async function verifyDeployment(expectedVersion, hashes) {
   const options = { redirect: "error", signal: AbortSignal.timeout(10_000) };
-  const version = await fetch(`${serviceUrl}/version.json`, options);
-  if (!version.ok || (await version.json()).releaseId !== releaseId) {
+  const response = await fetch(`${serviceUrl}/version.json`, options);
+  const publicVersion = response.ok ? await response.json() : null;
+  if (!matchesVersion(publicVersion, expectedVersion)) {
     throw new Error(
       "The public version.json does not match the staged release.",
     );
@@ -49,6 +51,12 @@ async function verifyDeployment(releaseId, hashes) {
   }
 }
 
+function matchesVersion(actual, expected) {
+  return Object.entries(expected).every(
+    ([key, value]) => actual?.[key] === value,
+  );
+}
+
 async function activate(manifestFile) {
   const env = process.env;
   if (
@@ -63,23 +71,15 @@ async function activate(manifestFile) {
   }
 
   const manifest = JSON.parse(await readFile(manifestFile, "utf8"));
-  const { releaseId, commit, buildId, files } = manifest;
-  if (
-    !/^[0-9a-f]{40}$/i.test(commit) ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      buildId?.split(":").at(-1),
-    ) ||
-    commit !== env.CODEBUILD_RESOLVED_SOURCE_VERSION ||
-    buildId !== env.CODEBUILD_BUILD_ID ||
-    releaseId !== `${commit}-${buildId.split(":").at(-1)}`
-  ) {
+  const version = await readDevelopmentVersion();
+  if (!matchesVersion(manifest, version)) {
     throw new Error(
       "Staged release metadata does not match this CodeBuild run.",
     );
   }
   const hashes = {};
   for (const path of ["index.html", "calendar/index.txt"]) {
-    const hash = files?.find((file) => file.path === path)?.sha256;
+    const hash = manifest.files?.find((file) => file.path === path)?.sha256;
     if (!/^[0-9a-f]{64}$/.test(hash)) {
       throw new Error(`Missing staged hash for ${path}.`);
     }
@@ -140,10 +140,7 @@ async function activate(manifestFile) {
     ];
     aws([...metadata, manifestFile, activeUri + "/release-manifest.json"]);
     const versionFile = join(dirname(manifestFile), "version.json");
-    await writeFile(
-      versionFile,
-      JSON.stringify({ releaseId, commit, buildId }) + "\n",
-    );
+    await writeFile(versionFile, JSON.stringify(version) + "\n");
     // Publish the version marker only after the complete export has been uploaded.
     aws([...metadata, versionFile, activeUri + "/version.json"]);
     const invalidationId = aws([
@@ -164,8 +161,10 @@ async function activate(manifestFile) {
     let lastError;
     while (Date.now() < deadline) {
       try {
-        await verifyDeployment(releaseId, hashes);
-        console.log(`Verified development release ${releaseId}.`);
+        await verifyDeployment(version, hashes);
+        console.log(
+          `Verified development release ${version.version} (${version.releaseId}).`,
+        );
         return;
       } catch (error) {
         lastError = error;

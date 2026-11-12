@@ -195,7 +195,7 @@ describe("AI 추천 목록 연결", () => {
       ).toBeNull();
       expect(screen.getByText("마음에 드는 일을 담아보세요.")).toBeTruthy();
       expect(screen.getByText("추천을 건너뛰었어요.")).toBeTruthy();
-      expect(document.activeElement).toBe(restore);
+      await waitFor(() => expect(document.activeElement).toBe(restore));
       expect(mocks.fetch).not.toHaveBeenCalled();
       fireEvent.click(restore);
       expect(task("웨딩홀 투어").checked).toBe(false);
@@ -203,7 +203,9 @@ describe("AI 추천 목록 연결", () => {
         screen.getByRole<HTMLButtonElement>("button", { name: "0개 추가" })
           .disabled,
       ).toBe(true);
-      expect(document.activeElement).toBe(task("웨딩홀 투어"));
+      await waitFor(() =>
+        expect(document.activeElement).toBe(task("웨딩홀 투어")),
+      );
       expect(mocks.catalog).toHaveBeenCalledOnce();
       expect(mocks.stream).toHaveBeenCalledOnce();
     },
