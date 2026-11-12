@@ -36,6 +36,7 @@ phases:
 
         required_variables=(
           FE_SERVICE_URL
+          CLOUDFRONT_DISTRIBUTION_ID
           BIBBIDI_GA_MEASUREMENT_ID
           BIBBIDI_SENTRY_DSN
           SENTRY_ORG
@@ -62,7 +63,10 @@ phases:
         pnpm --filter bibbidi-fe typecheck
         pnpm --filter bibbidi-fe test
         pnpm --filter bibbidi-fe build
-        node infra/frontend/stage-release.mjs
+        release_dir=$(mktemp -d)
+        trap 'rm -rf "$release_dir"' EXIT
+        node infra/frontend/stage-release.mjs "$release_dir/release-manifest.json"
+        node infra/frontend/activate-release.mjs "$release_dir/release-manifest.json"
 
 cache:
   paths:
