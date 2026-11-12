@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { CatalogCategoryModel } from "../catalog";
 
 import {
   useAppHeaderChecklistRevision,
@@ -17,13 +18,15 @@ import { AppHeaderSummary } from "./view/AppHeaderSummary";
 interface AppHeaderSummaryFeatureProps {
   onAuthenticationRequired: () => void;
   navigationKey?: string;
+  catalogCategories?: CatalogCategoryModel[];
 }
 
 export function AppHeaderSummaryFeature({
   onAuthenticationRequired,
   navigationKey,
+  catalogCategories,
 }: AppHeaderSummaryFeatureProps) {
-  const summaryRepository = useAppHeaderSummaryRepository();
+  const summaryRepository = useAppHeaderSummaryRepository(catalogCategories);
   const weddingDateRepository = useWeddingDateRepository();
   const checklistRevision = useAppHeaderChecklistRevision();
   const [summary, setSummary] = useState<AppHeaderSummaryModel | null>(null);

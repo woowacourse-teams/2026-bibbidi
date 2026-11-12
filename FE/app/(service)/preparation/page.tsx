@@ -1,3 +1,9 @@
-"use client";
+import { PreparationCatalogPage } from "../../../src/screens/PreparationCatalogPage";
+import { readCatalogSnapshot } from "../../catalogSnapshot";
+import { preparationMetadata } from "../../siteMetadata";
 
-export { PreparationCatalogPage as default } from "../../../src/screens/PreparationCatalogPage";
+export const metadata = preparationMetadata;
+
+export default function Page() {
+  return <PreparationCatalogPage catalog={readCatalogSnapshot()} />;
+}

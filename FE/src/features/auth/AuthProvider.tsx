@@ -36,6 +36,7 @@ interface AuthContextValue {
 
 interface AuthProviderProps {
   children: ReactNode;
+  keepChildrenOnError?: boolean;
 }
 
 type AuthenticationSynchronizationResult =
@@ -45,7 +46,10 @@ type AuthenticationSynchronizationResult =
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({
+  children,
+  keepChildrenOnError = false,
+}: AuthProviderProps) {
   const [authState, setAuthState] = useState<AuthState>({ status: "loading" });
   const [requestRevision, setRequestRevision] = useState(0);
   const authRevisionRef = useRef(0);
@@ -224,7 +228,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   let content = children;
 
-  if (authState.status === "error") {
+  if (authState.status === "error" && !keepChildrenOnError) {
     content = (
       <main>
         <p role="alert">로그인 상태를 확인하지 못했습니다.</p>

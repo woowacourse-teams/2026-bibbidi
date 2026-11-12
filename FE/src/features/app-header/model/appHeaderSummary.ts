@@ -1,4 +1,8 @@
-import type { ChecklistQueryModel } from "../../checklist";
+import type { CatalogCategoryModel } from "../../catalog";
+import type {
+  ChecklistQueryModel,
+  MyChecklistItemModel,
+} from "../../checklist";
 
 export interface AppHeaderSummaryModel {
   categories: AppHeaderCategorySummaryModel[];
@@ -26,6 +30,37 @@ export function createAppHeaderSummaryModel(
     };
   });
 
+  return summarize(categories);
+}
+
+export function summarizePersonalChecklist(
+  catalogCategories: CatalogCategoryModel[],
+  items: MyChecklistItemModel[],
+): AppHeaderSummaryModel {
+  const categories = new Map(
+    catalogCategories.map(({ id, label }) => [
+      id,
+      { id, title: label, totalTaskCount: 0, completedTaskCount: 0 },
+    ]),
+  );
+  for (const item of items) {
+    const id = String(item.categoryId);
+    const category = categories.get(id) ?? {
+      id,
+      title: "기타 준비",
+      totalTaskCount: 0,
+      completedTaskCount: 0,
+    };
+    category.totalTaskCount += 1;
+    if (item.status === "done") category.completedTaskCount += 1;
+    categories.set(id, category);
+  }
+  return summarize([...categories.values()]);
+}
+
+function summarize(
+  categories: AppHeaderCategorySummaryModel[],
+): AppHeaderSummaryModel {
   return {
     categories,
     completedTaskCount: categories.reduce(

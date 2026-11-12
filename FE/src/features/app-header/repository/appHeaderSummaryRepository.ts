@@ -1,11 +1,16 @@
+import type { CatalogCategoryModel } from "../../catalog";
 import {
   ChecklistQueryAuthenticationRequiredError,
   ChecklistQueryRepository,
   ChecklistQueryRequestAbortedError,
+  MyChecklistAuthenticationRequiredError,
+  MyChecklistRequestAbortedError,
+  type MyChecklistQueryRepository,
 } from "../../checklist";
 import {
   AppHeaderSummaryModel,
   createAppHeaderSummaryModel,
+  summarizePersonalChecklist,
 } from "../model/appHeaderSummary";
 
 export interface AppHeaderSummaryRepository {
@@ -36,21 +41,42 @@ export class AppHeaderSummaryRequestAbortedError extends Error {
 export function createAppHeaderSummaryRepository(
   checklistRepository: ChecklistQueryRepository,
 ): AppHeaderSummaryRepository {
+  return createSummaryRepository(async (signal) =>
+    createAppHeaderSummaryModel(
+      await checklistRepository.getChecklist("authenticated", signal),
+    ),
+  );
+}
+
+export function createSnapshotHeaderSummaryRepository(
+  catalogCategories: CatalogCategoryModel[],
+  checklistRepository: MyChecklistQueryRepository,
+): AppHeaderSummaryRepository {
+  return createSummaryRepository(async (signal) => {
+    const { items } = await checklistRepository.getChecklist(signal);
+    return summarizePersonalChecklist(catalogCategories, items);
+  });
+}
+
+function createSummaryRepository(
+  load: AppHeaderSummaryRepository["getSummary"],
+): AppHeaderSummaryRepository {
   return {
     async getSummary(signal) {
       try {
-        const checklist = await checklistRepository.getChecklist(
-          "authenticated",
-          signal,
-        );
-
-        return createAppHeaderSummaryModel(checklist);
+        return await load(signal);
       } catch (error) {
-        if (error instanceof ChecklistQueryAuthenticationRequiredError) {
+        if (
+          error instanceof ChecklistQueryAuthenticationRequiredError ||
+          error instanceof MyChecklistAuthenticationRequiredError
+        ) {
           throw new AppHeaderAuthenticationRequiredError({ cause: error });
         }
 
-        if (error instanceof ChecklistQueryRequestAbortedError) {
+        if (
+          error instanceof ChecklistQueryRequestAbortedError ||
+          error instanceof MyChecklistRequestAbortedError
+        ) {
           throw new AppHeaderSummaryRequestAbortedError({ cause: error });
         }
 

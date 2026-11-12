@@ -176,6 +176,7 @@ export function PreparationRoadmap({
   return (
     <div
       className="preparation-roadmap"
+      data-catalog-content-visible
       data-page-content-state={
         viewModel.progressStatus === "ready"
           ? "success"

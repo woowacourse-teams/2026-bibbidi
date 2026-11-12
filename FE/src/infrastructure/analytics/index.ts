@@ -29,16 +29,11 @@ export const analytics = createAnalyticsClient(providers);
 export function startPagePerformanceTracking(router: TimingRouter) {
   const provider = posthogProvider;
   if (!provider) return () => {};
-  const stopContent = startPageContentTiming(router, provider.trackPerformance);
-  const stopPersonal = startPageContentTiming(
-    router,
-    provider.trackPerformance,
-    "personal",
+  const stopTracking = (["content", "personal", "catalog"] as const).map(
+    (measure) =>
+      startPageContentTiming(router, provider.trackPerformance, measure),
   );
-  return () => {
-    stopContent();
-    stopPersonal();
-  };
+  return () => stopTracking.forEach((stop) => stop());
 }
 
 export type { AnalyticsClient, AnalyticsEvent } from "./analytics";

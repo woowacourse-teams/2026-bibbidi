@@ -60,6 +60,9 @@ jobs:
         run: pnpm --filter bibbidi-fe test
 
       - name: Build static export
+        env:
+          BIBBIDI_CATALOG_API_ORIGIN: https://dev-api.bibbidi.kr
+          FE_SERVICE_URL: https://dev.bibbidi.kr
         run: pnpm --filter bibbidi-fe build
 
       - name: Verify public export

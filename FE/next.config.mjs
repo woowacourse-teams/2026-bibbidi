@@ -28,7 +28,10 @@ export default function config(phase) {
 
   const posthogEnabled = process.env.BIBBIDI_POSTHOG_ENABLED === "true";
   const nextConfig = {
-    ...(!isDev && { output: "export" }),
+    ...(!isDev && {
+      output: "export",
+      generateBuildId: () => process.env.BIBBIDI_BUILD_ID ?? null,
+    }),
     agentRules: false,
     trailingSlash: true,
     skipTrailingSlashRedirect: true,

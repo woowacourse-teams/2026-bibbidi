@@ -31,7 +31,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function setup(path = "/preparation", measure?: "personal") {
+function setup(path = "/preparation", measure?: "personal" | "catalog") {
   let notify: Parameters<TimingRouter["subscribe"]>[0] = () => {};
   const router: TimingRouter = {
     state: { location: { pathname: path }, navigation: {} },
@@ -222,4 +222,42 @@ describe("개인 준비 현황 표시 시간", () => {
       expect(track.mock.calls[0][0].parameters.outcome).toBe(state);
     },
   );
+});
+
+describe("공개 준비 목록 표시 시간", () => {
+  it("초기 HTML의 공개 목록을 인증 상태와 독립적으로 관찰한다", () => {
+    document.getElementById("root")!.innerHTML =
+      '<div class="preparation-catalog-page"><div data-catalog-content-visible data-personal-preparation-state="unknown"></div></div>';
+    const { track } = setup("/", "catalog");
+    expect(track).not.toHaveBeenCalled();
+    paint();
+    expect(track).toHaveBeenCalledExactlyOnceWith({
+      name: "catalog_content_visible",
+      parameters: expect.objectContaining({
+        navigation_kind: "document",
+        measurement_version: 1,
+        timing_source: "document_observation",
+        outcome: "success",
+      }),
+    });
+  });
+
+  it("내부 이동에서 공개 목록이 DOM에 반영된 뒤 기록한다", async () => {
+    const { track, pending, navigate } = setup("/calendar", "catalog");
+    pending("/preparation");
+    navigate("/preparation");
+    await content("loading");
+    paint();
+    expect(track).not.toHaveBeenCalled();
+    document
+      .querySelector("[data-page-content-state]")!
+      .setAttribute("data-catalog-content-visible", "");
+    await Promise.resolve();
+    paint();
+    expect(track.mock.calls[0][0].parameters).toMatchObject({
+      navigation_kind: "spa",
+      timing_source: "spa_dom_commit",
+      outcome: "success",
+    });
+  });
 });

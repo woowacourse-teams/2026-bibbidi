@@ -10,11 +10,17 @@ export interface TimingRouter {
   subscribe: (listener: (state: RouterSnapshot) => void) => () => void;
 }
 
-// 첫 콘텐츠가 DOM에 반영된 뒤 두 프레임을 기다린 근사치다. 이미지 로드 완료 시간은 아니다.
+const eventNames = {
+  catalog: "catalog_content_visible",
+  content: "page_content_timing",
+  personal: "personal_preparation_timing",
+} as const;
+
+// DOM을 확인한 뒤 두 프레임을 기다린다. 정적 HTML은 계측 시작 전에 표시될 수 있다.
 export function startPageContentTiming(
   router: TimingRouter,
   track: (event: AnalyticsEvent) => void,
-  measure: "content" | "personal" = "content",
+  measure: keyof typeof eventNames = "content",
 ) {
   if (typeof MutationObserver === "undefined") return () => {};
   let pathname = "";
@@ -40,10 +46,7 @@ export function startPageContentTiming(
     observer.disconnect();
     try {
       track({
-        name:
-          measure === "personal"
-            ? "personal_preparation_timing"
-            : "page_content_timing",
+        name: eventNames[measure],
         parameters: {
           page_path: current.path,
           screen_name: "preparation_catalog",
@@ -54,7 +57,15 @@ export function startPageContentTiming(
             Math.round(performance.now() - current.startedAt),
           ),
           outcome,
-          ...(measure === "personal" ? { measurement_version: 1 } : {}),
+          ...(measure !== "content" ? { measurement_version: 1 } : {}),
+          ...(measure === "catalog"
+            ? {
+                timing_source:
+                  current.kind === "document"
+                    ? "document_observation"
+                    : "spa_dom_commit",
+              }
+            : {}),
         },
       });
     } catch {
@@ -62,6 +73,13 @@ export function startPageContentTiming(
     }
   };
   const contentOutcome = () => {
+    if (
+      measure === "catalog" &&
+      root.querySelector(
+        ".preparation-catalog-page [data-catalog-content-visible]",
+      )
+    )
+      return "success";
     if (measure === "personal") {
       const personalState = root
         .querySelector(
@@ -119,10 +137,11 @@ export function startPageContentTiming(
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter:
-        measure === "personal"
-          ? ["data-page-content-state", "data-personal-preparation-state"]
-          : ["data-page-content-state"],
+      attributeFilter: [
+        "data-page-content-state",
+        ...(measure === "personal" ? ["data-personal-preparation-state"] : []),
+        ...(measure === "catalog" ? ["data-catalog-content-visible"] : []),
+      ],
     });
     checkContent();
   };
