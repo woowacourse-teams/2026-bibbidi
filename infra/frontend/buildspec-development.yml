@@ -25,7 +25,7 @@ phases:
 
         if [ "$S3_BUCKET_NAME" != "techcourse-project-2026" ] ||
            [ "$S3_PREFIX" != "bibbidi/fe/development" ]; then
-          echo "Next.js release staging is only enabled for the Bibbidi development build." >&2
+          echo "Next.js publication is only enabled for the Bibbidi development build." >&2
           exit 1
         fi
 
@@ -58,6 +58,7 @@ phases:
       - |
         set -euo pipefail
 
+        node --test infra/frontend/activate-release.test.mjs
         pnpm --filter bibbidi-fe lint
         pnpm --filter bibbidi-fe format:check
         pnpm --filter bibbidi-fe typecheck
