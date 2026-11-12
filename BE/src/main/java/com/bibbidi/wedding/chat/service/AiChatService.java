@@ -38,7 +38,8 @@ public class AiChatService {
             ChatCommand chatCommand,
             Supplier<CancelReason> outputCancelReason
     ) {
-        UUID conversationId = chatCommand.conversationId() == null ? UUID.randomUUID() : chatCommand.conversationId();
+        boolean resumed = chatCommand.conversationId() != null;
+        UUID conversationId = resumed ? chatCommand.conversationId() : UUID.randomUUID();
         ConversationKey key = new ConversationKey(chatCommand.userId(), conversationId);
 
         return Flux.defer(
@@ -56,7 +57,7 @@ public class AiChatService {
 
                     return Flux.concat(
                                     Flux.just(new ChatResult.Conversation(conversationId.toString())),
-                                    Flux.defer(() -> streamReply(key, chatCommand.message(), cancelReason))
+                                    Flux.defer(() -> streamReply(key, chatCommand.message(), resumed, cancelReason))
                             )
                             .takeUntilOther(current.newerRequestArrived().asMono())
                             .doFinally(ignored -> activeConversations.remove(key, current));
@@ -67,6 +68,7 @@ public class AiChatService {
     private Flux<ChatResult> streamReply(
             ConversationKey key,
             String message,
+            boolean resumed,
             Supplier<CancelReason> cancelReason
     ) {
         ChatTurn turn = new ChatTurn();
@@ -76,14 +78,20 @@ public class AiChatService {
                 .toList();
 
         return Flux.merge(outputs)
-                .doOnSubscribe(ignored -> turn.start(
-                        conversationPort.stream(key.userId(), key.toMemoryKey(), message))
-                )
+                .doOnSubscribe(ignored -> turn.start(replyFor(key, message, resumed)))
                 .doFinally(
                         signalType -> turn.cancel(
                                 signalType == SignalType.CANCEL ? cancelReason.get() : CancelReason.CONSUMER_FAILED
                         )
                 );
+    }
+
+    private Flux<ChatResult> replyFor(ConversationKey key, String message, boolean resumed) {
+        if (!resumed) {
+            return conversationPort.stream(key.userId(), key.toMemoryKey(), message);
+        }
+        return conversationPort.restoreContext(key.toMemoryKey())
+                .thenMany(Flux.defer(() -> conversationPort.stream(key.userId(), key.toMemoryKey(), message)));
     }
 
     private record ActiveRequest(Sinks.Empty<Void> newerRequestArrived, AtomicBoolean replaced) {

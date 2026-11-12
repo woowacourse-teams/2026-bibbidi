@@ -57,6 +57,48 @@ class ChatTurnRepositoryTest {
     }
 
     @Test
+    @DisplayName("완료한 최근 턴만 오래된 순서로 한도까지 돌려준다")
+    void findsRecentCompletedTurnsOldestFirstWithinTheLimit() {
+        // given
+        saveTurn(7L, CONVERSATION_ID, "첫 질문", ChatTurnOutcome.COMPLETED, 0);
+        saveTurn(7L, CONVERSATION_ID, "취소된 질문", ChatTurnOutcome.CANCELLED, 1);
+        saveTurn(7L, CONVERSATION_ID, "실패한 질문", ChatTurnOutcome.FAILED, 2);
+        saveTurn(7L, CONVERSATION_ID, "둘째 질문", ChatTurnOutcome.COMPLETED, 3);
+        saveTurn(7L, CONVERSATION_ID, "셋째 질문", ChatTurnOutcome.COMPLETED, 4);
+
+        // when
+        List<ChatTurnRecord> turns = chatTurnRepository.findRecentCompleted(7L, CONVERSATION_ID, 2);
+
+        // then
+        assertThat(turns).extracting(ChatTurnRecord::userPrompt).containsExactly("둘째 질문", "셋째 질문");
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 대화와 다른 대화의 턴은 돌려주지 않는다")
+    void doesNotFindTurnsOfAnotherUserOrConversation() {
+        // given
+        UUID anotherConversation = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        saveTurn(7L, CONVERSATION_ID, "내 질문", ChatTurnOutcome.COMPLETED, 0);
+        saveTurn(8L, CONVERSATION_ID, "남의 질문", ChatTurnOutcome.COMPLETED, 1);
+        saveTurn(7L, anotherConversation, "다른 대화 질문", ChatTurnOutcome.COMPLETED, 2);
+
+        // when
+        List<ChatTurnRecord> mine = chatTurnRepository.findRecentCompleted(7L, CONVERSATION_ID, 10);
+        List<ChatTurnRecord> unknown = chatTurnRepository.findRecentCompleted(
+                7L, UUID.fromString("22222222-2222-2222-2222-222222222222"), 10);
+
+        // then
+        assertThat(mine).extracting(ChatTurnRecord::userPrompt).containsExactly("내 질문");
+        assertThat(unknown).isEmpty();
+    }
+
+    private void saveTurn(Long userId, UUID conversationId, String prompt, ChatTurnOutcome outcome, int minutes) {
+        chatTurnRepository.save(new ChatTurnRecord(
+                userId, conversationId, prompt, prompt + " 답변", "test-model", outcome, null,
+                STARTED_AT.plusMinutes(minutes), 100));
+    }
+
+    @Test
     @DisplayName("완료한 턴은 사유 없이 저장하고 긴 출력과 빈 출력도 저장한다")
     void savesACompletedTurnWithoutReasonAndLongOrEmptyCompletion() {
         // given

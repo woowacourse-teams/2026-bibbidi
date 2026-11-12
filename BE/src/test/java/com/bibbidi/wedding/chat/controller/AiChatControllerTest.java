@@ -36,6 +36,7 @@ import com.bibbidi.wedding.chat.controller.sse.SseStreamManager;
 import com.bibbidi.wedding.chat.controller.sse.config.SseConfig;
 import com.bibbidi.wedding.chat.service.AiChatService;
 import com.bibbidi.wedding.chat.service.subscriber.ClientSubscriber;
+import com.bibbidi.wedding.chat.adapter.ai.memory.StoredConversationRestorer;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
 import com.bibbidi.wedding.common.domain.UserRole;
@@ -123,6 +124,8 @@ class AiChatControllerTest {
     private BibbidiTokenParser bibbidiTokenParser;
     @MockitoBean
     private ModelClassifier classifier;
+    @MockitoBean
+    private StoredConversationRestorer restorer;
     private MockMvc mockMvc;
     private static final List<Prompt> RECEIVED_PROMPTS = new CopyOnWriteArrayList<>();
     private static volatile Function<Prompt, Flux<ChatResponse>> responder = prompt -> Flux.empty();
