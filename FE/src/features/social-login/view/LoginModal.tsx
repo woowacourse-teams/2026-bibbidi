@@ -1,5 +1,16 @@
-import { useId, useLayoutEffect, useRef, useState } from "react";
-import { Outlet, Navigate, useLocation, useNavigate } from "react-router";
+import {
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "../../../app/navigation/navigation";
 import { Dialog } from "../../../components/dialog";
 import { IconButton } from "../../../components/icon-button";
 import { useAuth } from "../../auth/AuthProvider";
@@ -8,22 +19,28 @@ import {
   rememberLoginReturnPath,
   consumeLoginReturnPath,
 } from "../../auth/model/loginReturnPath";
-import type { LoginModalState } from "../../auth/useLoginModal";
+import { LoginCallbackContext, type LoginCallback } from "./callbackState";
 import { useLogout } from "../../auth/useLogout";
 import { OnboardingModal } from "../../onboarding/OnboardingModal";
 import { SocialLoginResult } from "./SocialLoginResult";
 import { SocialLoginForm } from "./SocialLoginForm";
 import "./LoginModal.css";
 
-export function LoginModalLayout() {
+export function LoginModalLayout({ children }: { children?: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { authState, endAuthentication } = useAuth();
   const [contentBusy, setContentBusy] = useState(false);
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
-  const modal = (location.state as LoginModalState | null)?.loginModal;
-  const callback = modal?.callback;
+  const modal = location.state?.loginModal;
+  const [pendingCallback, setCallback] = useState<LoginCallback | null>(null);
+  const callbackContext = useMemo(() => ({ setCallback }), [setCallback]);
+  const callback =
+    pendingCallback?.returnTo ===
+    `${location.pathname}${location.search}${location.hash}`
+      ? pendingCallback
+      : null;
   const isOnboarding = !callback && authState.status === "onboardingRequired";
   const title = isOnboarding ? "약관 동의" : "로그인";
   const open =
@@ -36,6 +53,7 @@ export function LoginModalLayout() {
   }, [step, open]);
 
   const dismiss = () => {
+    setCallback(null);
     if (modal?.hasBackground) void navigate(-1);
     else {
       const state = { ...location.state };
@@ -63,8 +81,8 @@ export function LoginModalLayout() {
   };
 
   return (
-    <>
-      <Outlet />
+    <LoginCallbackContext value={callbackContext}>
+      {children}
       <Dialog
         className="login-modal"
         aria-labelledby={titleId}
@@ -103,7 +121,7 @@ export function LoginModalLayout() {
               <SocialLoginResult
                 provider={callback.provider}
                 search={callback.search}
-                returnTo={modal?.returnTo ?? "/"}
+                returnTo={callback.returnTo}
               />
             ) : isOnboarding ? (
               <OnboardingModal onBusyChange={setContentBusy} />
@@ -126,7 +144,7 @@ export function LoginModalLayout() {
           </p>
         )}
       </Dialog>
-    </>
+    </LoginCallbackContext>
   );
 }
 
@@ -134,7 +152,6 @@ export function LoginModalLayout() {
 export function LegacyLoginRedirect() {
   const { search } = useLocation();
   const returnTo = getSafeLoginReturnPath(search) ?? "/";
-  return (
-    <Navigate replace to={returnTo} state={{ loginModal: { returnTo } }} />
-  );
+  const state = useMemo(() => ({ loginModal: { returnTo } }), [returnTo]);
+  return <Navigate replace to={returnTo} state={state} />;
 }

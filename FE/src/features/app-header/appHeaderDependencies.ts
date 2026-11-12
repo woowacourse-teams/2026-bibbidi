@@ -3,16 +3,30 @@ import { useMemo } from "react";
 import {
   useChecklistQueryRepository,
   useMyChecklistRevision,
+  useMyChecklistQueryRepository,
 } from "../checklist";
-import { createAppHeaderSummaryRepository } from "./repository/appHeaderSummaryRepository";
+import type { CatalogCategoryModel } from "../catalog";
+import {
+  createAppHeaderSummaryRepository,
+  createSnapshotHeaderSummaryRepository,
+} from "./repository/appHeaderSummaryRepository";
 import { createWeddingDateRepository } from "./repository/weddingDateRepository";
 
-export function useAppHeaderSummaryRepository() {
+export function useAppHeaderSummaryRepository(
+  catalogCategories?: CatalogCategoryModel[],
+) {
   const checklistRepository = useChecklistQueryRepository();
+  const personalRepository = useMyChecklistQueryRepository();
 
   return useMemo(
-    () => createAppHeaderSummaryRepository(checklistRepository),
-    [checklistRepository],
+    () =>
+      catalogCategories
+        ? createSnapshotHeaderSummaryRepository(
+            catalogCategories,
+            personalRepository,
+          )
+        : createAppHeaderSummaryRepository(checklistRepository),
+    [catalogCategories, checklistRepository, personalRepository],
   );
 }
 

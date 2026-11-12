@@ -4,8 +4,8 @@ import { createPostHogProvider } from "./posthogProvider";
 import { startPageContentTiming, type TimingRouter } from "./pageContentTiming";
 
 const googleAnalyticsMeasurementId =
-  typeof __BIBBIDI_GA_MEASUREMENT_ID__ === "string"
-    ? __BIBBIDI_GA_MEASUREMENT_ID__
+  typeof process.env.NEXT_PUBLIC_BIBBIDI_GA_MEASUREMENT_ID === "string"
+    ? process.env.NEXT_PUBLIC_BIBBIDI_GA_MEASUREMENT_ID
     : "";
 
 const providers = googleAnalyticsMeasurementId
@@ -13,16 +13,13 @@ const providers = googleAnalyticsMeasurementId
   : [];
 let posthogProvider: ReturnType<typeof createPostHogProvider> | undefined;
 
-if (
-  typeof __BIBBIDI_POSTHOG_ENABLED__ !== "undefined" &&
-  __BIBBIDI_POSTHOG_ENABLED__
-) {
+if (process.env.NEXT_PUBLIC_BIBBIDI_POSTHOG_ENABLED === "true") {
   posthogProvider = createPostHogProvider({
     enabled: true,
-    token: __BIBBIDI_POSTHOG_PROJECT_TOKEN__,
-    host: __BIBBIDI_POSTHOG_HOST__,
-    environment: __BIBBIDI_APP_ENV__,
-    appVersion: __BIBBIDI_APP_VERSION__,
+    token: process.env.NEXT_PUBLIC_BIBBIDI_POSTHOG_PROJECT_TOKEN ?? "",
+    host: process.env.NEXT_PUBLIC_BIBBIDI_POSTHOG_HOST ?? "",
+    environment: process.env.NEXT_PUBLIC_BIBBIDI_APP_ENV ?? "",
+    appVersion: process.env.NEXT_PUBLIC_BIBBIDI_APP_VERSION ?? "",
   });
   providers.push(posthogProvider);
 }
@@ -32,16 +29,11 @@ export const analytics = createAnalyticsClient(providers);
 export function startPagePerformanceTracking(router: TimingRouter) {
   const provider = posthogProvider;
   if (!provider) return () => {};
-  const stopContent = startPageContentTiming(router, provider.trackPerformance);
-  const stopPersonal = startPageContentTiming(
-    router,
-    provider.trackPerformance,
-    "personal",
+  const stopTracking = (["content", "personal", "catalog"] as const).map(
+    (measure) =>
+      startPageContentTiming(router, provider.trackPerformance, measure),
   );
-  return () => {
-    stopContent();
-    stopPersonal();
-  };
+  return () => stopTracking.forEach((stop) => stop());
 }
 
 export type { AnalyticsClient, AnalyticsEvent } from "./analytics";

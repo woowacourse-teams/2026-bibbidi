@@ -9,11 +9,12 @@ import {
 } from "@testing-library/react";
 import {
   MemoryRouter,
+  Outlet,
   Route,
   Routes,
   useLocation,
   useNavigate,
-} from "react-router";
+} from "../test/memoryNavigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const analyticsMocks = vi.hoisted(() => ({
@@ -92,7 +93,15 @@ function renderServiceLayout(
       <ChecklistMigrationProvider>
         <MemoryRouter initialEntries={initialEntries}>
           <Routes>
-            <Route element={<ServiceLayout />}>{routes}</Route>
+            <Route
+              element={
+                <ServiceLayout>
+                  <Outlet />
+                </ServiceLayout>
+              }
+            >
+              {routes}
+            </Route>
           </Routes>
         </MemoryRouter>
       </ChecklistMigrationProvider>
@@ -651,14 +660,14 @@ describe("ServiceLayout", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
-  it("준비 목록과 헤더가 내 체크리스트 조회를 공유한다", async () => {
+  it("인증 전 표시한 준비 목록을 유지하고 인증 뒤 헤더와 내 체크리스트를 공유한다", async () => {
+    let resolveUser!: (response: Response) => void;
+    const pendingUser = new Promise<Response>((resolve) => {
+      resolveUser = resolve;
+    });
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/users/me") {
-        return Promise.resolve(
-          new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
-            status: 200,
-          }),
-        );
+        return pendingUser;
       }
 
       if (url === "/api/catalog") {
@@ -693,12 +702,23 @@ describe("ServiceLayout", () => {
       ["/preparation"],
     );
 
+    const list = await screen.findByRole("list", { name: "준비 단계" });
+    expect(screen.queryByRole("progressbar")).toBeNull();
     expect(
-      await screen.findByRole("heading", {
-        name: "첫 번째 카테고리",
-      }),
-    ).toBeTruthy();
+      fetchMock.mock.calls.filter(([url]) => url === "/api/catalog"),
+    ).toHaveLength(1);
+    expect(
+      fetchMock.mock.calls.some(([url]) => url === "/api/checklists/me"),
+    ).toBe(false);
+    await act(async () =>
+      resolveUser(
+        new Response(JSON.stringify({ id: 1, nickname: "비비디" }), {
+          status: 200,
+        }),
+      ),
+    );
     expect(await screen.findByText("준비 완료율 · 50%")).toBeTruthy();
+    expect(screen.getByRole("list", { name: "준비 단계" })).toBe(list);
     expect(
       fetchMock.mock.calls.filter(([url]) => url === "/api/checklists/me"),
     ).toHaveLength(1);

@@ -2,7 +2,10 @@ import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFe
 import type { AddedChecklistCatalogItemModel } from "../../checklist";
 import { isValidLocalDateTime } from "../../../shared/validation/isValidLocalDateTime";
 
-const apiBaseUrl = __BIBBIDI_API_BASE_URL__.replace(/\/+$/, "");
+const apiBaseUrl = (process.env.NEXT_PUBLIC_BIBBIDI_API_BASE_URL ?? "").replace(
+  /\/+$/,
+  "",
+);
 const MY_CHECKLIST_ENDPOINT = `${apiBaseUrl}/api/checklists/me`;
 const ADD_CHECKLIST_CATALOG_ITEMS_ENDPOINT = `${MY_CHECKLIST_ENDPOINT}/catalog-items`;
 const CHECKLIST_REQUEST_TIMEOUT_MS = 10_000;

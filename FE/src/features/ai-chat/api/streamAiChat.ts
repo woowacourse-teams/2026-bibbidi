@@ -2,7 +2,7 @@ import { authenticatedFetch } from "../../../infrastructure/http/authenticatedFe
 import { isValidChatMessage } from "../model/aiChat";
 import { readSseEvents, SseEvent } from "./readSseEvents";
 
-const CHAT_ENDPOINT = `${__BIBBIDI_API_BASE_URL__.replace(/\/+$/, "")}/api/ai/chat`;
+const CHAT_ENDPOINT = `${(process.env.NEXT_PUBLIC_BIBBIDI_API_BASE_URL ?? "").replace(/\/+$/, "")}/api/ai/chat`;
 // 서버의 기본 60초 제한 뒤 15초의 수신 여유를 두고 완료/실패 이벤트를 기다린다.
 const CHAT_TIMEOUT_MS = 75_000;
 const UUID_PATTERN = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i;

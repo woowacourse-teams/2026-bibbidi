@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "../../../app/navigation/navigation";
 import "./RoadmapGameInvitation.css";
 
 export function RoadmapGameInvitation() {
@@ -6,15 +6,15 @@ export function RoadmapGameInvitation() {
     <Link
       className="roadmap-game-invitation"
       to="/balance-game"
-      aria-label="우리 결혼 취향 알아보기"
+      aria-label="어디서부터 준비할지 막막한가요?"
     >
       <span className="roadmap-game-invitation__strip" aria-hidden="true" />
       <span className="roadmap-game-invitation__copy">
         <span className="roadmap-game-invitation__title">
-          우리 결혼 취향 알아보기
+          어디서부터 준비할지 막막한가요?
         </span>
         <span className="roadmap-game-invitation__description">
-          둘의 취향에 맞는 준비 할 일을 찾아보세요.
+          간단한 테스트로 체크리스트를 추천받아 보세요
         </span>
       </span>
       <span className="roadmap-game-invitation__stub" aria-hidden="true">

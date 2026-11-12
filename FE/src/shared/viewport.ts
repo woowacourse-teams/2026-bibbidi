@@ -9,17 +9,25 @@ export interface ViewportMetrics {
   bottomInset: number;
 }
 
+const initialViewport: ViewportMetrics = {
+  height: 0,
+  offsetTop: 0,
+  layoutHeight: 0,
+  layoutWidth: 0,
+  scale: 1,
+  bottomInset: 0,
+};
+
 function readViewport(): ViewportMetrics {
-  const view = typeof window === "undefined" ? undefined : window;
-  const viewport = view?.visualViewport;
-  const height = viewport?.height ?? view?.innerHeight ?? 0;
+  const viewport = window.visualViewport;
+  const height = viewport?.height ?? window.innerHeight;
   const offsetTop = viewport?.offsetTop ?? 0;
-  const layoutHeight = view?.innerHeight ?? 0;
+  const layoutHeight = window.innerHeight;
   return {
     height,
     offsetTop,
     layoutHeight,
-    layoutWidth: view?.innerWidth ?? 0,
+    layoutWidth: window.innerWidth,
     scale: viewport?.scale ?? 1,
     bottomInset: Math.max(0, layoutHeight - height - offsetTop),
   };
@@ -27,7 +35,7 @@ function readViewport(): ViewportMetrics {
 
 /** Consumers share measurements rather than each owning viewport event handlers. */
 export function useViewportMetrics(active: boolean) {
-  const [metrics, setMetrics] = useState(readViewport);
+  const [metrics, setMetrics] = useState(initialViewport);
   useLayoutEffect(() => {
     if (!active) return;
     const viewport = window.visualViewport;
@@ -60,6 +68,7 @@ export function viewportStyles(
   metrics: ViewportMetrics,
   prefix: string,
 ): CSSProperties {
+  if (metrics.height <= 0) return {};
   return {
     [`--${prefix}-viewport-height`]: `${metrics.height}px`,
     [`--${prefix}-viewport-top`]: `${metrics.offsetTop}px`,

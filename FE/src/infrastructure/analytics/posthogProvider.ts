@@ -272,7 +272,8 @@ export function createPostHogProvider(
     trackPerformance(event) {
       if (
         event.name !== "page_content_timing" &&
-        event.name !== "personal_preparation_timing"
+        event.name !== "personal_preparation_timing" &&
+        event.name !== "catalog_content_visible"
       )
         return;
       const path = event.parameters.page_path;

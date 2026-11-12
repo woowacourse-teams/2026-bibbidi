@@ -1,13 +1,5 @@
-import { useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate } from "../../app/navigation/navigation";
 import { getSafeLoginReturnPath } from "./model/loginReturnPath";
-
-export interface LoginModalState {
-  loginModal?: {
-    returnTo: string;
-    hasBackground?: boolean;
-    callback?: { provider: string; search: string };
-  };
-}
 
 export function useLoginModal(returnTo?: string) {
   const location = useLocation();

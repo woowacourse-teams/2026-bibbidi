@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 // Keep this condition aligned with --layout-breakpoint-md in ../styles/tokens.css.
 export const MOBILE_LAYOUT_MEDIA_QUERY = "(width < 768px)";
@@ -15,25 +15,17 @@ function getMediaQueryMatch(query: string, fallback: boolean) {
 }
 
 export function useMediaQuery(query: string, fallback = false) {
-  const [matches, setMatches] = useState(() =>
-    getMediaQueryMatch(query, fallback),
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      if (typeof window.matchMedia !== "function") return () => {};
+      const mediaQuery = window.matchMedia(query);
+      mediaQuery.addEventListener("change", listener);
+      return () => mediaQuery.removeEventListener("change", listener);
+    },
+    [query],
   );
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia(query);
-    const handleChange = () => setMatches(mediaQuery.matches);
-
-    handleChange();
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, [query]);
-
-  return matches;
+  const getSnapshot = () => getMediaQueryMatch(query, fallback);
+  return useSyncExternalStore(subscribe, getSnapshot, () => fallback);
 }
 
 export function useIsMobileLayout() {

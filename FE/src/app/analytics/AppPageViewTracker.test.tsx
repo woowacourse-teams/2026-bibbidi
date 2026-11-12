@@ -1,12 +1,16 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import {
+  createMemoryRouter,
+  Outlet,
+  RouterProvider,
+} from "../../test/memoryNavigation";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../../features/auth";
 import { ChecklistMigrationProvider } from "../../features/checklist-migration";
 import type { AnalyticsClient } from "../../infrastructure/analytics";
-import { appRoutes } from "../router";
+import { appRoutes } from "../../test/productRoutes";
 import { AppPageViewTracker } from "./AppPageViewTracker";
 
 afterEach(() => {
@@ -37,19 +41,29 @@ describe("AppPageViewTracker", () => {
         reset: vi.fn(),
         track: vi.fn(),
       };
-      const router = createMemoryRouter(appRoutes, { initialEntries: [entry] });
+      const router = createMemoryRouter(
+        [
+          {
+            element: (
+              <>
+                <AppPageViewTracker
+                  client={analytics}
+                  origin="https://bibbidi.example"
+                />
+                <Outlet />
+              </>
+            ),
+            children: appRoutes,
+          },
+        ],
+        { initialEntries: [entry] },
+      );
 
       render(
         <StrictMode>
           <AuthProvider>
             <ChecklistMigrationProvider>
-              <AppPageViewTracker
-                analytics={analytics}
-                origin="https://bibbidi.example"
-                router={router}
-              >
-                <RouterProvider router={router} />
-              </AppPageViewTracker>
+              <RouterProvider router={router} />
             </ChecklistMigrationProvider>
           </AuthProvider>
         </StrictMode>,
@@ -89,21 +103,31 @@ describe("AppPageViewTracker", () => {
       reset: vi.fn(),
       track: vi.fn(),
     };
-    const router = createMemoryRouter(appRoutes, {
-      initialEntries: ["/calendar?taskId=private"],
-    });
+    const router = createMemoryRouter(
+      [
+        {
+          element: (
+            <>
+              <AppPageViewTracker
+                client={analytics}
+                origin="https://bibbidi.example"
+              />
+              <Outlet />
+            </>
+          ),
+          children: appRoutes,
+        },
+      ],
+      {
+        initialEntries: ["/calendar?taskId=private"],
+      },
+    );
 
     render(
       <StrictMode>
         <AuthProvider>
           <ChecklistMigrationProvider>
-            <AppPageViewTracker
-              analytics={analytics}
-              origin="https://bibbidi.example"
-              router={router}
-            >
-              <RouterProvider router={router} />
-            </AppPageViewTracker>
+            <RouterProvider router={router} />
           </ChecklistMigrationProvider>
         </AuthProvider>
       </StrictMode>,

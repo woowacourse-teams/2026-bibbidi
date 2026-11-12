@@ -6,7 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, RouterProvider } from "../test/memoryNavigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../features/auth";
@@ -24,7 +24,7 @@ import {
   hasWebAccessToken,
   resetWebAuthSessionForTest,
 } from "../infrastructure/auth/webSessionManager";
-import { appRoutes } from "./router";
+import { appRoutes } from "../test/productRoutes";
 
 function installFetch(currentUserResponse: Response) {
   installLegacyWebSessionFetch(
@@ -144,7 +144,7 @@ describe("appRoutes", () => {
     await screen.findByRole("region", { name: "소셜 로그인" });
     expect(router.state.location.pathname).toBe("/balance-game");
     expect(router.state.location.search).toBe("");
-    expect(router.state.location.state.loginModal.returnTo).toBe(
+    expect(router.state.location.state?.loginModal?.returnTo).toBe(
       "/balance-game",
     );
   });
@@ -253,6 +253,12 @@ describe("appRoutes", () => {
             );
           }
 
+          if (url === "/api/catalog") {
+            return Promise.resolve(
+              new Response(JSON.stringify(preparationCatalogResponseFixture)),
+            );
+          }
+
           if (url === "/api/terms") {
             return Promise.resolve(
               new Response(
@@ -284,10 +290,17 @@ describe("appRoutes", () => {
         await screen.findByRole("heading", { name: "가입 마무리" }),
       ).toBeTruthy();
       expect(router.state.location.pathname).toBe(path);
-      // The complete app tree is mounted: only session refresh and public terms may load.
+      const allowedRequests = ["/api/auth/web/sessions/refresh", "/api/terms"];
+      if (path === "/preparation") {
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/catalog",
+          expect.objectContaining({ credentials: "omit" }),
+        );
+        allowedRequests.push("/api/catalog");
+      }
       expect(
         new Set(fetchMock.mock.calls.map(([input]) => input.toString())),
-      ).toEqual(new Set(["/api/auth/web/sessions/refresh", "/api/terms"]));
+      ).toEqual(new Set(allowedRequests));
 
       fireEvent.click(
         screen.getByRole("button", { name: "다른 계정으로 로그인" }),
@@ -421,6 +434,9 @@ describe("appRoutes", () => {
       }),
     ).toBeTruthy();
     expect(router.state.location.pathname).toBe("/");
+    expect(
+      await screen.findByText(/단계 · 내 할 일 0개 · 완료 0개/),
+    ).toBeTruthy();
     expect(
       fetchMock.mock.calls
         .map(([input]) => input.toString())
@@ -612,22 +628,15 @@ describe("appRoutes", () => {
   });
 
   it.each(["/unknown", "/planner"])(
-    "지원하지 않는 경로 %s를 루트로 이동시킨다",
+    "지원하지 않는 경로 %s에서 404 화면을 보여준다",
     async (initialEntry) => {
-      installFetch(
-        new Response(
-          JSON.stringify({ errorCode: 201, message: "로그인이 필요합니다." }),
-          { status: 401 },
-        ),
-      );
       const router = renderRouter([initialEntry]);
-
       expect(
         await screen.findByRole("heading", {
-          name: "첫 번째 카테고리",
+          name: "페이지를 찾을 수 없어요.",
         }),
       ).toBeTruthy();
-      expect(router.state.location.pathname).toBe("/");
+      expect(router.state.location.pathname).toBe(initialEntry);
     },
   );
 

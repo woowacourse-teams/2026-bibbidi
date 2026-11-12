@@ -20,6 +20,7 @@ interface PreparationRoadmapProps {
   categoryId: string;
   viewModel: PreparationRoadmapViewModel;
   selectedStepId: string;
+  personalScope: object;
   isGuest: boolean;
   onRetryProgress: () => void;
   additionErrorMessage: string | null;
@@ -142,6 +143,7 @@ export function PreparationRoadmap({
   categoryId,
   viewModel,
   selectedStepId,
+  personalScope,
   isGuest,
   onRetryProgress,
   additionErrorMessage,
@@ -154,15 +156,19 @@ export function PreparationRoadmap({
   const [openStage, setOpenStage] = useState<{
     categoryId: string;
     stepId: string;
+    scope: object;
   } | null>(null);
   const returnFocusRef = useRef<HTMLButtonElement>(null);
   const stage =
-    openStage?.categoryId === categoryId && openStage.stepId === selectedStepId
+    openStage?.scope === personalScope &&
+    openStage.categoryId === categoryId &&
+    openStage.stepId === selectedStepId
       ? viewModel.stages.find((item) => item.id === openStage.stepId)
       : undefined;
   const detailOpen = stage !== undefined;
   const { present, onExited } = useLayerPresence(detailOpen);
   const displayedStage = useExitSnapshot(detailOpen, stage);
+  const displayedScope = useExitSnapshot(detailOpen, personalScope);
   const pending = addingCatalogItemIds.length > 0;
   const close = () => {
     if (!pending) setOpenStage(null);
@@ -170,7 +176,12 @@ export function PreparationRoadmap({
   return (
     <div
       className="preparation-roadmap"
-      data-page-content-state="success"
+      data-catalog-content-visible
+      data-page-content-state={
+        viewModel.progressStatus === "ready"
+          ? "success"
+          : viewModel.progressStatus
+      }
       data-personal-preparation-state={
         isGuest ? "guest" : viewModel.progressStatus
       }
@@ -211,7 +222,11 @@ export function PreparationRoadmap({
                 stage={item}
                 onOpen={(trigger) => {
                   returnFocusRef.current = trigger;
-                  setOpenStage({ categoryId, stepId: item.id });
+                  setOpenStage({
+                    categoryId,
+                    stepId: item.id,
+                    scope: personalScope,
+                  });
                   onStepSelect(item.id);
                 }}
               />
@@ -219,7 +234,7 @@ export function PreparationRoadmap({
           </ol>
         </section>
       </div>
-      {present && displayedStage && (
+      {present && displayedStage && displayedScope === personalScope && (
         <RoadmapStageDetail
           stage={displayedStage}
           open={detailOpen}

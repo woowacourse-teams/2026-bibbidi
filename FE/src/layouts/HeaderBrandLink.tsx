@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "../app/navigation/navigation";
 
 import { BibidiBrand } from "../components/BibidiBrand/BibidiBrand";
 import "./HeaderBrandLink.css";

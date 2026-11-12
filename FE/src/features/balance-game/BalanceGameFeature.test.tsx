@@ -7,7 +7,10 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import {
+  createMemoryRouter,
+  RouterProvider,
+} from "../../test/memoryNavigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PreparationAuthenticationRequiredError } from "../preparation";
 import { BalanceGameFeature } from "./BalanceGameFeature";
@@ -408,9 +411,11 @@ describe("공개 밸런스게임과 행동 계측", () => {
     renderGame("guest", true);
     await finishGame();
     await screen.findByRole("button", { name: "로그인하고 2개 할 일 담기" });
-    expect(events("balance_game_question_view")).toHaveLength(2);
-    expect(events("balance_game_card_view")).toHaveLength(1);
-    expect(events("balance_game_recommendation_view")).toHaveLength(1);
+    await waitFor(() => {
+      expect(events("balance_game_question_view")).toHaveLength(2);
+      expect(events("balance_game_card_view")).toHaveLength(1);
+      expect(events("balance_game_recommendation_view")).toHaveLength(1);
+    });
     expect(events("balance_game_task_select")).toHaveLength(0);
     expect(mocks.checklist.getCatalogItemIds).toHaveBeenCalledWith(
       "guest",
@@ -539,8 +544,10 @@ describe("공개 밸런스게임과 행동 계측", () => {
       ).toBe(false);
       expect(getBalanceGameQuestions).not.toHaveBeenCalled();
       expect(getBalanceGameResult).not.toHaveBeenCalled();
-      expect(events("balance_game_card_view")).toHaveLength(1);
-      expect(events("balance_game_recommendation_view")).toHaveLength(1);
+      await waitFor(() => {
+        expect(events("balance_game_card_view")).toHaveLength(1);
+        expect(events("balance_game_recommendation_view")).toHaveLength(1);
+      });
       expect(readBalanceGameDraft()).toBeUndefined();
     },
   );

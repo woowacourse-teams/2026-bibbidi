@@ -121,6 +121,30 @@ describe("PostHog 첫 화면 성능", () => {
       },
     });
   });
+  it("공개 목록 계측은 인증이 끝나도 표시 시점의 상태를 보존한다", () => {
+    const { sdk, client, provider } = setup();
+    provider.trackPerformance({
+      name: "catalog_content_visible",
+      parameters: {
+        ...timing.parameters,
+        timing_source: "document_observation",
+      },
+    });
+    expect(sdk.capture).not.toHaveBeenCalled();
+    client.setContext({ authState: "guest", pathname: "/preparation" });
+    expect(sdk.capture).toHaveBeenCalledExactlyOnceWith(
+      "catalog_content_visible",
+      expect.objectContaining({
+        auth_state: "loading",
+        timing_source: "document_observation",
+      }),
+    );
+    const [[event, properties]] = sdk.capture.mock.calls;
+    expect(beforeSend(sdk)({ uuid: "test", event, properties })).toMatchObject({
+      event: "catalog_content_visible",
+      properties: { timing_source: "document_observation" },
+    });
+  });
   it("SDK Web Vitals도 인증 전에는 보내지 않고 정제한 값만 대기시킨다", () => {
     window.history.replaceState(null, "", "/preparation?code=secret");
     const { sdk, client } = setup();

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { readBalanceGameDraft } from "./model/balanceGameDraft";
-import { useNavigate } from "react-router";
+import { useNavigate } from "../../app/navigation/navigation";
 import { Result } from "../../components/result";
 import { useBalanceGame } from "./useBalanceGame";
 import { BalanceGameQuestionView } from "./view/BalanceGameQuestionView";

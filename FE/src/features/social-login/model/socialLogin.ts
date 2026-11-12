@@ -1,8 +1,8 @@
 /** 서버와 연동을 마친 제공자다. 나머지는 준비 중 안내를 보여 준다. */
-const CONNECTED_SOCIAL_PROVIDERS = ["kakao", "google"];
+export const CONNECTED_SOCIAL_PROVIDERS = ["kakao", "google"] as const;
 
 export function isConnectedSocialProvider(provider: string): boolean {
-  return CONNECTED_SOCIAL_PROVIDERS.includes(provider);
+  return CONNECTED_SOCIAL_PROVIDERS.some((connected) => connected === provider);
 }
 
 export interface SocialLoginSession {

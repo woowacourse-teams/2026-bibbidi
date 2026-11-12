@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { Link } from "react-router";
+import { Link } from "../../../app/navigation/navigation";
 import { ChevronRight } from "../../../components/icons/Chevron";
 import "./CalendarList.css";
 

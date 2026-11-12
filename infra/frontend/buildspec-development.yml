@@ -1,0 +1,74 @@
+version: 0.2
+
+env:
+  shell: bash
+  variables:
+    S3_BUCKET_NAME: techcourse-project-2026
+    S3_PREFIX: bibbidi/fe/development
+    BIBBIDI_CATALOG_API_ORIGIN: https://dev-api.bibbidi.kr
+    NEXT_TELEMETRY_DISABLED: "1"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 24
+    commands:
+      - corepack enable
+      - corepack prepare pnpm@11.20.0 --activate
+      - node --version
+      - pnpm --version
+
+  pre_build:
+    commands:
+      - |
+        set -euo pipefail
+
+        if [ "$S3_BUCKET_NAME" != "techcourse-project-2026" ] ||
+           [ "$S3_PREFIX" != "bibbidi/fe/development" ]; then
+          echo "Next.js publication is only enabled for the Bibbidi development build." >&2
+          exit 1
+        fi
+
+        if [ "${BIBBIDI_SENTRY_ENABLED:-}" != "true" ]; then
+          echo "Development FE deployment requires Sentry error tracking." >&2
+          exit 1
+        fi
+
+        required_variables=(
+          FE_SERVICE_URL
+          CLOUDFRONT_DISTRIBUTION_ID
+          BIBBIDI_GA_MEASUREMENT_ID
+          BIBBIDI_SENTRY_DSN
+          SENTRY_ORG
+          SENTRY_PROJECT
+          SENTRY_AUTH_TOKEN
+        )
+
+        for variable_name in "${required_variables[@]}"; do
+          if [ -z "${!variable_name:-}" ]; then
+            echo "Missing CodeBuild environment variable: ${variable_name}" >&2
+            exit 1
+          fi
+        done
+
+        pnpm install --frozen-lockfile
+
+  build:
+    commands:
+      - |
+        set -euo pipefail
+
+        node --test infra/frontend/activate-release.test.mjs
+        pnpm --filter bibbidi-fe lint
+        pnpm --filter bibbidi-fe format:check
+        pnpm --filter bibbidi-fe typecheck
+        pnpm --filter bibbidi-fe test
+        pnpm --filter bibbidi-fe build
+        release_dir=$(mktemp -d)
+        trap 'rm -rf "$release_dir"' EXIT
+        node infra/frontend/stage-release.mjs "$release_dir/release-manifest.json"
+        node infra/frontend/activate-release.mjs "$release_dir/release-manifest.json"
+
+cache:
+  paths:
+    - /root/.local/share/pnpm/store/**/*

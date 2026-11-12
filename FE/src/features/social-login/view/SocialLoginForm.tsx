@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-import loginCouplePreview from "../../../assets/login-couple-preview.png";
 import { analytics } from "../../../infrastructure/analytics";
 import {
   createSocialLoginEvent,
@@ -132,7 +131,7 @@ export function SocialLoginForm({
         <img
           alt="체크리스트와 달력을 함께 살펴보는 예비부부"
           draggable={false}
-          src={loginCouplePreview}
+          src="/brand/login-couple-preview.png"
         />
       </aside>
 
