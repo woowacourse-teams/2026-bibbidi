@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const exportDir = "FE/out";
+const stagedManifestFile = process.argv[2];
 const developmentReleaseRoot =
   "s3://techcourse-project-2026/bibbidi/fe/development/releases";
 const revalidate = "public,max-age=0,must-revalidate";
@@ -95,10 +96,8 @@ try {
   const versionFile = join(metadataDir, "version.json");
   const manifestFile = join(metadataDir, "release-manifest.json");
   await writeFile(versionFile, JSON.stringify(version) + "\n");
-  await writeFile(
-    manifestFile,
-    JSON.stringify({ ...version, files }, null, 2) + "\n",
-  );
+  const manifest = JSON.stringify({ ...version, files }, null, 2) + "\n";
+  await writeFile(manifestFile, manifest);
 
   upload(
     exportDir + "/",
@@ -133,6 +132,11 @@ try {
     "--content-type",
     "application/json",
   );
+  if (stagedManifestFile) {
+    await writeFile(stagedManifestFile, manifest, {
+      flag: "wx",
+    });
+  }
   console.log(`Staged ${paths.length} files at ${releaseUri}/`);
 } finally {
   await rm(metadataDir, { recursive: true, force: true });
