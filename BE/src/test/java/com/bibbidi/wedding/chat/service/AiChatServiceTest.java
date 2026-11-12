@@ -8,6 +8,7 @@ import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.adapter.ai.parser.ReactiveChatAnswerStream;
 import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
 import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
+import com.bibbidi.wedding.chat.service.port.AiConversationPort;
 import com.bibbidi.wedding.chat.service.subscriber.ClientSubscriber;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import com.bibbidi.wedding.chat.service.turn.TurnContext;
@@ -36,6 +37,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.test.publisher.TestPublisher;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -123,6 +125,49 @@ class AiChatServiceTest {
         UUID generatedId = UUID.fromString(conversation.conversationId());
         assertThat(received.getLast()).isInstanceOf(ChatResult.Completed.class);
         assertThat(generatedId).isNotNull();
+    }
+
+    @Test
+    @DisplayName("기존 대화 ID로 이어가면 모델을 부르기 전에 대화 맥락을 복원한다")
+    void restoresContextBeforeCallingTheModelWhenResumingAConversation() {
+        // given
+        List<String> events = new CopyOnWriteArrayList<>();
+        service = new AiChatService(recordingPort(events), List.of(new ClientSubscriber()));
+
+        // when
+        runChat(USER_ID, CONVERSATION_ID, "이어서 질문");
+
+        // then
+        assertThat(events).containsExactly("restore:" + USER_ID + ":" + CONVERSATION_ID, "stream");
+    }
+
+    @Test
+    @DisplayName("새 대화는 복원할 맥락이 없으므로 복원하지 않는다")
+    void doesNotRestoreContextForANewConversation() {
+        // given
+        List<String> events = new CopyOnWriteArrayList<>();
+        service = new AiChatService(recordingPort(events), List.of(new ClientSubscriber()));
+
+        // when
+        runChat(USER_ID, null, "첫 질문");
+
+        // then
+        assertThat(events).containsExactly("stream");
+    }
+
+    private AiConversationPort recordingPort(List<String> events) {
+        return new AiConversationPort() {
+            @Override
+            public Flux<ChatResult> stream(Long userId, String conversationKey, String userPrompt) {
+                events.add("stream");
+                return parsedResponse(Flux.just(answerJson("답변")));
+            }
+
+            @Override
+            public Mono<Void> restoreContext(String conversationKey) {
+                return Mono.fromRunnable(() -> events.add("restore:" + conversationKey));
+            }
+        };
     }
 
     @Test

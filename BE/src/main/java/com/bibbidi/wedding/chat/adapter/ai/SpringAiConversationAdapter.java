@@ -2,6 +2,7 @@ package com.bibbidi.wedding.chat.adapter.ai;
 
 import com.bibbidi.wedding.chat.adapter.ai.client.ChatModelRequest;
 import com.bibbidi.wedding.chat.adapter.ai.client.SpringAiChatClient;
+import com.bibbidi.wedding.chat.adapter.ai.memory.StoredConversationRestorer;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.adapter.ai.parser.ReactiveChatAnswerStream;
 import com.bibbidi.wedding.chat.adapter.ai.routing.ChatModelTier;
@@ -37,6 +38,7 @@ public class SpringAiConversationAdapter implements AiConversationPort {
     private final SpringAiChatClient chatClient;
     private final JacksonChatAnswerParser answerParser;
     private final ChatMemory chatMemory;
+    private final StoredConversationRestorer restorer;
 
     private final ModelClassifier classifier;
 
@@ -45,11 +47,13 @@ public class SpringAiConversationAdapter implements AiConversationPort {
             SpringAiChatClient chatClient,
             JacksonChatAnswerParser answerParser,
             ChatMemory chatMemory,
+            StoredConversationRestorer restorer,
             ModelClassifier classifier
     ) {
         this.chatClient = chatClient;
         this.answerParser = answerParser;
         this.chatMemory = chatMemory;
+        this.restorer = restorer;
         this.classifier = classifier;
     }
 
@@ -57,7 +61,8 @@ public class SpringAiConversationAdapter implements AiConversationPort {
     public Flux<ChatResult> stream(Long userId, String conversationKey, String userPrompt) {
         return mapModelErrors(Flux.defer(() -> {
                             ChatModelRequest request = new ChatModelRequest(
-                                    userId, conversationKey, new UserMessage(userPrompt));
+                                    userId, conversationKey, new UserMessage(userPrompt)
+                            );
                             return classifier.classify(conversationKey, userPrompt)
                                     .flatMapMany(classification -> {
                                         if (classification.isBlocked()) {
@@ -82,6 +87,16 @@ public class SpringAiConversationAdapter implements AiConversationPort {
                         }
                 )
         );
+    }
+
+    @Override
+    public Mono<Void> restoreContext(String conversationKey) {
+        return Mono.<Void>fromRunnable(() -> restorer.restoreIfNoCompletedTurn(conversationKey))
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(error -> {
+                    log.warn("저장된 대화 맥락 복원 실패. type={}", error.getClass().getSimpleName());
+                    return Mono.empty();
+                });
     }
 
     private Mono<ChatResult> refreshIfWritten(ChatModelRequest request) {

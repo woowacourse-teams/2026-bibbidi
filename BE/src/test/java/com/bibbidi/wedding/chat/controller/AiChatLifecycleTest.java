@@ -21,6 +21,7 @@ import com.bibbidi.wedding.chat.service.subscriber.ClientSubscriber;
 import com.bibbidi.wedding.chat.service.ConversationKey;
 import com.bibbidi.wedding.chat.service.dto.result.ChatResult;
 import com.bibbidi.wedding.chat.service.dto.command.ChatCommand;
+import com.bibbidi.wedding.chat.adapter.ai.memory.StoredConversationRestorer;
 import com.bibbidi.wedding.chat.adapter.ai.parser.JacksonChatAnswerParser;
 import com.bibbidi.wedding.chat.service.turn.CancelReason;
 import com.bibbidi.wedding.chat.support.FakeChatModel;
@@ -84,7 +85,7 @@ class AiChatLifecycleTest {
         when(classifier.classify(anyString(), anyString())).thenReturn(Mono.just(ModelClassifier.Classification.allow(ChatModelTier.LOW)));
         chat = new AiChatService(
                 new SpringAiConversationAdapter(SpringAiChatClientFixture.create(model, memory),
-                        new JacksonChatAnswerParser(mapper), memory, classifier),
+                        new JacksonChatAnswerParser(mapper), memory, mock(StoredConversationRestorer.class), classifier),
                 List.of(new ClientSubscriber()));
         answerStarted = false;
         scheduler = mock(ScheduledExecutorService.class);
