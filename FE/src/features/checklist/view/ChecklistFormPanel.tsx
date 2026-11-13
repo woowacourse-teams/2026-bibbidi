@@ -20,6 +20,7 @@ type ChecklistFormPanelProps = {
   formRef: RefObject<HTMLFormElement | null>;
   children: ReactNode;
   actions: ReactNode;
+  scrollActionsOnMobile?: boolean;
 } & (
   | { mobileAction?: "back"; backLabel: string }
   | { mobileAction: "close"; backLabel?: never }
@@ -40,8 +41,10 @@ export function ChecklistFormPanel({
   formRef,
   children,
   actions,
+  scrollActionsOnMobile = false,
 }: ChecklistFormPanelProps) {
   const mobile = useIsMobileLayout();
+  const scrollActions = mobile && scrollActionsOnMobile;
   useEffect(() => {
     if (modal) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -113,9 +116,14 @@ export function ChecklistFormPanel({
               />
             )
           }
-          footer={actions}
+          footer={scrollActions ? undefined : actions}
         >
           <div className="checklist-form-panel__fields">{children}</div>
+          {scrollActions && (
+            <div className="checklist-form-panel__scroll-actions">
+              {actions}
+            </div>
+          )}
         </Panel>
       </form>
     </Container>

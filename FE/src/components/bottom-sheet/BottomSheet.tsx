@@ -118,6 +118,7 @@ function Root({
         {
           ...style,
           "--bottom-sheet-drag-offset": `${drag.offset}px`,
+          "--bottom-sheet-backdrop-strength": `${48 * (1 - drag.progress)}%`,
           "--bottom-sheet-max-height":
             maxHeight !== undefined && Number.isFinite(maxHeight)
               ? `${Math.max(0, maxHeight)}px`

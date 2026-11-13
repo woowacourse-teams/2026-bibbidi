@@ -504,6 +504,7 @@ export function Select(props: SelectProps) {
         </p>
       )}
       {isOpen && (
+        // eslint-disable-next-line jsx-a11y-x/interactive-supports-focus -- The combobox keeps focus and uses aria-activedescendant.
         <div
           ref={panel}
           popover="manual"
@@ -516,7 +517,8 @@ export function Select(props: SelectProps) {
           className="bibbidi-select-list"
           data-size={size}
           style={position}
-          onPointerDown={(event) => event.preventDefault()}
+          // iOS Safari can still move focus on a tap after a canceled pointerdown.
+          onMouseDown={(event) => event.preventDefault()}
         >
           {options.length === 0 && (
             <div className="bibbidi-select-empty" role="presentation">
