@@ -20,7 +20,15 @@
   justify-content: center;
 }
 .bibbidi-bottom-sheet::backdrop {
-  background: color-mix(in srgb, var(--color-palette-ink) 48%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--color-palette-ink) var(--bottom-sheet-backdrop-strength, 48%),
+    transparent
+  );
+  transition: background-color 180ms ease-out;
+}
+.bibbidi-bottom-sheet[data-dragging]::backdrop {
+  transition: none;
 }
 .bibbidi-bottom-sheet-panel {
   display: flex;
@@ -191,6 +199,11 @@
 }
 .bibbidi-bottom-sheet[data-animation][data-state="closing"]::backdrop {
   animation: bibbidi-bottom-sheet-dim-out 240ms ease-in both;
+}
+.bibbidi-bottom-sheet[data-dragging][data-state="closing"]
+  .bibbidi-bottom-sheet-panel,
+.bibbidi-bottom-sheet[data-dragging][data-state="closing"]::backdrop {
+  animation-timing-function: ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
   .bibbidi-bottom-sheet[open][data-state] .bibbidi-bottom-sheet-panel,
