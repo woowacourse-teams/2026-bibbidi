@@ -39,6 +39,7 @@ export function AppointmentForm({
     titleComposition,
   } = useAppointmentFormView<HTMLButtonElement>(controller);
   const field = (key: "title" | "place") => ({
+    className: "appointment-form__text",
     id: `${idPrefix}-${key === "title" ? "title-input" : key}`,
     disabled: pending,
     value: controller.draft[key],
@@ -61,6 +62,7 @@ export function AppointmentForm({
       closeLabel={`${heading} 닫기`}
       modal={modal}
       blocked={blocked}
+      scrollActionsOnMobile
       isSubmitting={pending}
       onClose={controller.cancel}
       onSubmit={(event) => void submit(event)}
@@ -153,6 +155,7 @@ export function AppointmentForm({
         right={counter(controller.draft.place)}
       />
       <TextArea
+        className="appointment-form__text"
         label="메모"
         disabled={pending}
         value={controller.draft.memo}

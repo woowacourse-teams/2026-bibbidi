@@ -15,6 +15,8 @@ type Gesture = {
   ancestors: HTMLElement[];
 };
 
+const restingPosition = { offset: 0, progress: 0 };
+
 /** Share one gesture policy between mouse/pen pointers and native touch scrolling. */
 export function useBottomSheetDrag({
   panelRef,
@@ -27,11 +29,11 @@ export function useBottomSheetDrag({
   disableChildrenDragging: boolean;
   onDismiss: () => void;
 }) {
-  const [offset, setOffset] = useState(0);
+  const [position, setPosition] = useState(restingPosition);
   const [wasEnabled, setWasEnabled] = useState(enabled);
   if (enabled !== wasEnabled) {
     setWasEnabled(enabled);
-    if (enabled) setOffset(0);
+    if (enabled) setPosition(restingPosition);
   }
   const gesture = useRef<Gesture | null>(null);
   const dismiss = useRef(onDismiss);
@@ -109,7 +111,10 @@ export function useBottomSheetDrag({
     }
     preventDefault();
     current.offset = Math.max(0, dy);
-    setOffset(current.offset);
+    setPosition({
+      offset: current.offset,
+      progress: Math.min(1, current.offset / Math.max(1, current.height)),
+    });
   }
   function finish(id: number, source: Gesture["source"], cancelled = false) {
     const current = gesture.current;
@@ -124,11 +129,11 @@ export function useBottomSheetDrag({
       dismiss.current();
       // A controlled owner can decline the close request. Restore the drag then.
       queueMicrotask(() => {
-        if (enabledRef.current) setOffset(0);
+        if (enabledRef.current) setPosition(restingPosition);
       });
       return;
     }
-    setOffset(0);
+    setPosition(restingPosition);
   }
 
   // React touch listeners are passive. A native non-passive move listener can claim
@@ -139,7 +144,7 @@ export function useBottomSheetDrag({
     const start = (event: TouchEvent) => {
       if (event.touches.length !== 1) {
         gesture.current = null;
-        setOffset(0);
+        setPosition(restingPosition);
         return;
       }
       const touch = event.touches[0];
@@ -189,7 +194,7 @@ export function useBottomSheetDrag({
   }, [enabled, disableChildrenDragging, panelRef]);
 
   return {
-    offset,
+    ...position,
     onPointerDown(event: PointerEvent<HTMLDialogElement>) {
       if (
         event.pointerType === "touch" ||
