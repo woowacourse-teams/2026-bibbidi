@@ -2,9 +2,7 @@
 
 Kotlin Multiplatform 기반의 Android·iOS 최소 앱입니다. 공통 로직은 Kotlin으로,
 Android UI는 Jetpack Compose로, iOS UI는 SwiftUI로 구성합니다.
-현재는 Android·iOS에서 카카오 SDK 인증을 먼저 확인할 수 있습니다.
-카카오톡이 있으면 카카오톡 인증을 시도하고, 사용할 수 없으면 카카오계정 인증으로 진행합니다.
-성공·취소·오류와 SDK 로그아웃을 처리하며, 비비디 서버의 회원가입·로그인·JWT·WebView 연결은 후속 범위입니다.
+Android·iOS 앱을 실행하면 해당 환경의 비비디 웹 홈을 웹뷰로 엽니다.
 
 ## 구조
 
@@ -26,7 +24,6 @@ APP/
 
 Kotlin 2.3.21, AGP 9.0.0, Gradle 9.3.0을 사용합니다. 버전은 `gradle/libs.versions.toml`과 Wrapper에 고정합니다.
 Xcode 27에서 shared device·Simulator framework, SwiftUI Simulator·서명 없는 device Release 빌드를 검증했습니다.
-iOS 27의 iPhone 18 Pro Simulator에서 앱 설치·실행과 공통 앱 이름 표시를 확인했습니다.
 Kotlin 공식 호환표의 2.3.21 기준 Xcode 버전은 26.0이므로, 현재 조합의 빌드 검증과 공식 지원 범위는 구분해야 합니다.
 Gradle Daemon JVM은 `gradle/gradle-daemon-jvm.properties`로 JDK 25에 고정합니다.
 Wrapper의 Launcher JVM이 17·21이어도 실제 빌드를 실행하는 Daemon은 25를 선택합니다.
@@ -71,8 +68,7 @@ Android의 `src/dev`는 prod에 포함되지 않으며, iOS 개발 전용 코드
 개발 도구 허용 여부는 빌드에서 정하며 앱 설정으로 환경을 전환하지 않습니다.
 Android `BibbidiApplication.configuration`과 iOS `BibbidiApp.configuration`이
 공통 `AppConfiguration`에 환경·API·웹 주소를 전달합니다.
-실제 네트워크·WebView·OAuth 설정과 딥 링크 연결은 #213·#244·#245의 범위입니다.
-개발용 앱 ID에 맞는 provider 등록도 실제 인증 작업에서 진행합니다.
+웹뷰는 `AppConfiguration.webBaseUrl`을 시작 주소로 사용합니다.
 
 로컬 설정은 `local.properties.example`과 `iosApp/config/Endpoints.local.xcconfig.example`을 참고합니다.
 예제의 `.invalid` host를 실제 값으로 바꿔 로컬 파일에만 저장합니다.
@@ -143,8 +139,7 @@ xcodebuild -project APP/iosApp/iosApp.xcodeproj \
 ./APP/gradlew -p APP :shared:linkDebugFrameworkIosArm64 :shared:linkDebugFrameworkIosSimulatorArm64
 ```
 
-공통 모듈의 앱 이름 계약, Android에서 공통 모듈 접근, iOS 앱 실행 후 공통 앱 이름 표시를 테스트합니다.
-인증 상태와 실제 인증 연결은 #213에서 확장합니다. 별도의 fake 인증 앱은 만들지 않습니다.
+공통 모듈의 앱 이름 계약과 환경 설정, Android에서 공통 모듈 접근, iOS 시작 화면의 웹뷰 표시를 테스트합니다.
 iOS 타깃은 `iosArm64`, `iosSimulatorArm64`, `iosX64`입니다.
 Apple Silicon에서 Intel Simulator 테스트 실행은 지원하지 않습니다.
 
@@ -176,7 +171,7 @@ Apple Silicon에서 Intel Simulator 테스트 실행은 지원하지 않습니�
   이 APK는 설치·스토어 배포용이 아닙니다. devRelease는 개발용 debug key로 서명합니다.
 - 실제 기존 키로 서명되는지는 `release-app`의 원격 workflow에서 별도로 확인해야 합니다.
 - shared·Android·iOS PR CI는 `.github/workflows/app-ci.yml`에서 실행합니다.
-- 인증(#213·#242·#243), WebView(#244·#245), 브랜드 자산(#246)은 후속 작업입니다.
+- 브랜드 자산(#246)은 후속 작업입니다.
 
 추적: [#239](https://github.com/woowacourse-teams/2026-bibbidi/issues/239),
 [#211](https://github.com/woowacourse-teams/2026-bibbidi/issues/211).
@@ -241,22 +236,3 @@ xcodebuild -project APP/iosApp/iosApp.xcodeproj -scheme Bibbidi -configuration R
 
 iOS device Archive에는 Apple 개발 팀·인증서·프로비저닝 설정이 추가로 필요합니다.
 이번 환경 구성은 해당 인증 정보를 저장하거나 TestFlight 업로드를 자동화하지 않습니다.
-
-## 카카오 SDK 인증 먼저 확인하기
-
-Android·iOS는 Kakao SDK 2.26.0을 사용합니다. 실제 키를 코드에 넣지 않고 기존 로컬 설정에서 읽습니다.
-
-1. 카카오 Developers의 앱에 Android 패키지와 서명 키 해시, iOS Bundle ID를 등록하고 카카오 로그인을 활성화합니다. 개발 식별자는 두 플랫폼 모두 `com.bobbidi.bibbidi.dev`, 운영 식별자는 `com.bobbidi.bibbidi`입니다.
-2. 네이티브 앱 키를 `APP/local.properties`와 `APP/iosApp/config/Endpoints.local.xcconfig`에 추가합니다. 기존 SDK 경로·서버 주소는 그대로 둡니다.
-
-```properties
-APP_DEV_KAKAO_NATIVE_APP_KEY=개발용_네이티브_앱_키
-APP_PROD_KAKAO_NATIVE_APP_KEY=운영용_네이티브_앱_키
-```
-
-3. Android `devDebug`, iOS `Bibbidi Dev`로 실행하고 카카오 로그인 버튼을 누릅니다. iOS는 SDK 토큰 보관을 위해 Xcode의 기본 로컬 서명을 사용합니다. CLI에서 실행할 앱은 `CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=-`로 Simulator용 임시 서명을 적용할 수 있습니다. 키가 없어도 빌드·초기 화면 확인은 가능하며, 로그인 버튼을 누르면 준비되지 않았다는 안내가 표시됩니다.
-
-SDK의 토큰을 화면이나 로그에 출력하지 않습니다. SDK 인증 성공 시 화면에는 카카오 계정 인증 완료만 표시합니다. 앱을 다시 열면 카카오 인증 버튼으로 시작하며, 비비디 세션 자동 복원으로 취급하지 않습니다. 일반 카카오 SDK 인증 결과를 확인하는 단계이므로 별도의 서버 설정이나 OpenID Connect 활성화는 이 단계의 필수 조건이 아닙니다.
-
-- [Kakao Android 설정·로그인](https://developers.kakao.com/docs/ko/kakaologin/android)
-- [Kakao iOS 설정·로그인](https://developers.kakao.com/docs/ko/kakaologin/ios)

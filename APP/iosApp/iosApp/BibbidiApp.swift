@@ -1,6 +1,6 @@
 import Shared
 import SwiftUI
-import KakaoSDKAuth
+import WebKit
 
 @main
 struct BibbidiApp: App {
@@ -23,14 +23,26 @@ struct BibbidiApp: App {
         )
     }()
 
-    init() { KakaoLoginModel.configure() }
-
     var body: some Scene {
         WindowGroup {
-            KakaoLoginView()
-                .onOpenURL { url in
-                    if AuthApi.isKakaoTalkLoginUrl(url) { _ = AuthController.handleOpenUrl(url: url) }
-                }
+            BibbidiWebView(homeAddress: configuration.webBaseUrl)
         }
     }
+}
+
+private struct BibbidiWebView: UIViewRepresentable {
+    let homeAddress: String
+
+    func makeUIView(context: Context) -> WKWebView {
+        guard let homeURL = URL(string: homeAddress), let host = homeURL.host, !host.isEmpty else {
+            preconditionFailure("Invalid Bibbidi web address")
+        }
+
+        let webView = WKWebView()
+        webView.allowsBackForwardNavigationGestures = true
+        webView.load(URLRequest(url: homeURL))
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {}
 }
