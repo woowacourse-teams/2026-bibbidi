@@ -112,6 +112,12 @@ loki.process "normalize" {
     action   = "drop"
   }
 
+  // 로그가 끊긴 컨테이너는 재연결 때마다 마지막 줄이 다시 읽힌다. Loki가 7일 넘은 줄을 거부해 W7이 울리므로 보내기 전에 버린다.
+  stage.drop {
+    older_than          = "144h"
+    drop_counter_reason = "too_old"
+  }
+
   stage.json {
     expressions = {
       level      = "log.level || \"log.level\" || level || severity_text",
