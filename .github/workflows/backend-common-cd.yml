@@ -296,5 +296,37 @@ jobs:
           sudo systemctl daemon-reload
           sudo systemctl enable --now bibbidi-certbot-renew.timer
 
-      - name: 72시간이 지난 미사용 Docker 이미지 정리
-        run: docker image prune --all --force --filter "until=72h"
+      - name: 디스크 정리 스크립트 실행과 매일 도는 타이머 설치
+        env:
+          CLEANUP_SCRIPT: /opt/bibbidi/app/infra/scripts/host-maintenance/cleanup-disk.sh
+        run: |
+          set -euo pipefail
+          sudo install -D -m 0755 -o root -g root Infra/scripts/host-maintenance/cleanup-disk.sh "$CLEANUP_SCRIPT"
+
+          sudo tee /etc/systemd/system/bibbidi-disk-cleanup.service >/dev/null <<UNIT
+          [Unit]
+          Description=Clean up Bibbidi host disk
+          After=docker.service
+
+          [Service]
+          Type=oneshot
+          IOSchedulingClass=idle
+          ExecStart=$CLEANUP_SCRIPT
+          UNIT
+
+          sudo tee /etc/systemd/system/bibbidi-disk-cleanup.timer >/dev/null <<'UNIT'
+          [Unit]
+          Description=Run the Bibbidi host disk cleanup daily
+
+          [Timer]
+          OnCalendar=*-*-* 04:30:00 Asia/Seoul
+          RandomizedDelaySec=30m
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+          UNIT
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable --now bibbidi-disk-cleanup.timer
+          sudo "$CLEANUP_SCRIPT"
